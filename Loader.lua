@@ -10,8 +10,8 @@ local Players = game:GetService("Players")
 -- ============================================================
 -- EDIT THESE TWO URLS TO MATCH YOUR GITHUB
 -- ============================================================
-local CONFIG_URL = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/Config.lua"
-local CORE_URL   = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/Core.lua"
+local CONFIG_URL = "https://github.com/imtuffboybreday-dotcom/LeoWinners/blob/main/Config.lua"
+local CORE_URL   = "https://github.com/imtuffboybreday-dotcom/LeoWinners/blob/main/Core.lua"
 
 local function fail(reason)
     warn("[AntiSkid] " .. tostring(reason))
