@@ -942,4 +942,10 @@ end)
 
 pcall(function()
 
-    StarterGu
+    StarterGui:SetCore("SendNotification", {
+        Title = "Stable Reanimate",
+        Text = "Loaded successfully!",
+        Duration = 5
+    })
+
+end)
