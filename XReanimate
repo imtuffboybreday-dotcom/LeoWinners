@@ -6,7 +6,6 @@ local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local Stepped = RunService.Stepped
 local RenderStepped = RunService.RenderStepped
-local Heartbeat = RunService.Heartbeat
 
 local Character = LocalPlayer.Character
 if not Character or not Character.Parent then
@@ -21,7 +20,7 @@ local Settings = {
 	R15ToR6 = true,
 	HatCollide = false,
 	HumanoidState16 = true,
-	AddTools = false,
+	AddTools = true,
 	HeadAfterNeck = true,
 	LoadTime = Players.RespawnTime + 0.5,
 	Method = 3,
@@ -30,7 +29,9 @@ local Settings = {
 	MaxTorque = 1000000,
 	Responsiveness = 200,
 	Friction = 0.8,
-	Density = 0.7
+	Density = 0.7,
+	ToolHoldForce = 4000,
+	ToolHoldP = 3000
 }
 
 local c = Character
@@ -112,6 +113,38 @@ local function Align(Part0, Part1)
 	ao.Parent = Part0
 end
 
+local function StabilizeTool(tool)
+	if not tool or not tool:IsA("Tool") then
+		return
+	end
+
+	for _, part in ipairs(tool:GetDescendants()) do
+		if part:IsA("BasePart") then
+			pcall(function()
+				part.CanCollide = false
+				part.CanTouch = false
+				part.CanQuery = false
+				part.Massless = true
+				part.CustomPhysicalProperties = PhysicalProperties.new(0.3, 0.5, 0, 1, 1)
+				part.AssemblyLinearVelocity = ZERO
+				part.AssemblyAngularVelocity = ZERO
+			end)
+
+			local existing = part:FindFirstChild("XToolStableVelocity")
+			if existing then
+				existing:Destroy()
+			end
+
+			local bv = Instance.new("BodyVelocity")
+			bv.Name = "XToolStableVelocity"
+			bv.Velocity = ZERO
+			bv.MaxForce = Vector3.new(Settings.ToolHoldForce, Settings.ToolHoldForce, Settings.ToolHoldForce)
+			bv.P = Settings.ToolHoldP
+			bv.Parent = part
+		end
+	end
+end
+
 local function RespawnRequest()
 	if not c then
 		return
@@ -191,14 +224,12 @@ elseif Settings.NewAnimate then
 	end
 end
 
-local Backpack
-if Settings.AddTools then
-	Backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
-end
+local Backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
 
 if Settings.AddTools and Backpack then
 	for _, v in ipairs(Backpack:GetChildren()) do
 		if v:IsA("Tool") then
+			StabilizeTool(v)
 			v.Parent = c
 		end
 	end
@@ -315,16 +346,7 @@ end)
 for _, v in ipairs(c:GetChildren()) do
 	if v ~= model then
 		if Settings.AddTools and v:IsA("Tool") then
-			for _, v1 in ipairs(v:GetDescendants()) do
-				if v1:IsA("BasePart") then
-					local bv = Instance.new("BodyVelocity")
-					bv.Velocity = ZERO
-					bv.MaxForce = Vector3.new(1000, 1000, 1000)
-					bv.P = 1250
-					bv.Name = "StableToolVelocity"
-					bv.Parent = v1
-				end
-			end
+			StabilizeTool(v)
 		end
 		v.Parent = model
 	end
@@ -447,6 +469,7 @@ end
 if Settings.AddTools and Backpack then
 	for _, v in ipairs(c:GetChildren()) do
 		if v:IsA("Tool") then
+			StabilizeTool(v)
 			v.Parent = Backpack
 		end
 	end
@@ -497,6 +520,28 @@ if hum1 then
 	else
 		RespawnRequest()
 	end
+end
+
+local function OnToolEquipped(tool)
+	if tool and tool:IsA("Tool") then
+		StabilizeTool(tool)
+	end
+end
+
+if hum1 then
+	hum1.ChildAdded:Connect(function(child)
+		if child:IsA("Tool") then
+			OnToolEquipped(child)
+		end
+	end)
+end
+
+if c then
+	c.ChildAdded:Connect(function(child)
+		if child:IsA("Tool") then
+			OnToolEquipped(child)
+		end
+	end)
 end
 
 local rb = Instance.new("BindableEvent")
@@ -552,8 +597,8 @@ end)
 
 pcall(function()
 	StarterGui:SetCore("SendNotification", {
-		Title = "XReanimate V2",
-		Text = "Method:By Leo",
+		Title = "XReanimateV2.1",
+		Text = "method:Leo,CrazeScript",
 		Duration = 5
 	})
 end)
