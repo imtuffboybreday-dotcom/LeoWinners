@@ -2,634 +2,558 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
+
 local LocalPlayer = Players.LocalPlayer
-
-local Config = {
-NoclipAllParts = false,
-AntiRagdoll = true,
-NewAnimate = true,
-DisableCharScripts = true,
-HatCollide = false,
-HumState16 = true,
-AddTools = false,
-HeadAfterNeck = true,
-LoadTime = Players.RespawnTime + 0.4,
-Method = 3,
-MaxForce = 1e7,
-MaxTorque = 1e7,
-Responsiveness = 250,
-Friction = 0.9,
-Elasticity = 0,
-Notification = true,
-}
-
-if getgenv().XStableActive then
-return
-end
-getgenv().XStableActive = true
-
-local connections = {}
-local active = true
-local model = nil
-local c = nil
-local hum0 = nil
-local hum1 = nil
-local rb = nil
-local cachedParts = {}
-local cameraConn = nil
-
-local function track(conn)
-if conn then
-table.insert(connections, conn)
-end
-return conn
-end
-
-local function disconnectAll()
-for _, conn in ipairs(connections) do
-pcall(function()
-if typeof(conn) == "RBXScriptConnection" then
-conn:Disconnect()
-end
-end)
-end
-table.clear(connections)
-end
-
-local function safeDestroy(obj)
-if obj and obj.Parent then
-pcall(function()
-obj:Destroy()
-end)
-end
-end
-
-local function cleanupAligns(root)
-if not root or not root.Parent then return end
-for _, v in ipairs(root:GetDescendants()) do
-if v:IsA("AlignPosition") or v:IsA("AlignOrientation") then
-safeDestroy(v)
-elseif v:IsA("Attachment") and (string.find(v.Name, "XStable_Att0") or string.find(v.Name, "XStable_Att1")) then
-safeDestroy(v)
-end
-end
-end
-
-local function fullCleanup()
-active = false
-disconnectAll()
-
-if c and c.Parent then  
-	cleanupAligns(c)  
-end  
-
-if model and model.Parent then  
-	safeDestroy(model)  
-end  
-model = nil  
-
-if rb and rb.Parent then  
-	safeDestroy(rb)  
-end  
-rb = nil  
-
-cachedParts = {}  
-hum0 = nil  
-hum1 = nil  
-c = nil  
-cameraConn = nil  
-
-pcall(function()  
-	StarterGui:SetCore("ResetButtonCallback", true)  
-end)  
-
-getgenv().XStableActive = false
-
-end
-
-local function gp(parent, name, className)
-if typeof(parent) ~= "Instance" or not parent.Parent then
-return nil
-end
-for _, v in ipairs(parent:GetChildren()) do
-if v.Name == name and v:IsA(className) then
-return v
-end
-end
-return nil
-end
-
-local ZERO = Vector3.zero
-
-local function align(Part0, Part1)
-if not Part0 or not Part1 then return end
-if not Part0:IsA("BasePart") or not Part1:IsA("BasePart") then return end
-if not Part0.Parent or not Part1.Parent then return end
-
-pcall(function()  
-	Part0.CustomPhysicalProperties = PhysicalProperties.new(0.7, Config.Friction, Config.Elasticity, 1, 1)  
-	Part0.CanCollide = false  
-	Part0.CanTouch = false  
-	Part0.CanQuery = false  
-	Part0.Massless = true  
-	Part0.AssemblyLinearVelocity = ZERO  
-	Part0.AssemblyAngularVelocity = ZERO  
-end)  
-
-pcall(function()  
-	Part1.CanCollide = false  
-	Part1.CanTouch = false  
-	Part1.CanQuery = false  
-end)  
-
-local att0 = Instance.new("Attachment")  
-att0.Name = "XStable_Att0_" .. Part0.Name  
-att0.Position = ZERO  
-att0.Orientation = ZERO  
-att0.Parent = Part0  
-
-local att1 = Instance.new("Attachment")  
-att1.Name = "XStable_Att1_" .. Part1.Name  
-att1.Position = ZERO  
-att1.Orientation = ZERO  
-att1.Parent = Part1  
-
-local ap = Instance.new("AlignPosition")  
-ap.Name = "XStableAlignPosition"  
-ap.Attachment0 = att0  
-ap.Attachment1 = att1  
-ap.ApplyAtCenterOfMass = true  
-ap.MaxForce = Config.MaxForce  
-ap.MaxVelocity = math.huge  
-ap.Responsiveness = Config.Responsiveness  
-ap.ReactionForceEnabled = false  
-ap.RigidityEnabled = false  
-ap.Parent = Part0  
-
-local ao = Instance.new("AlignOrientation")  
-ao.Name = "XStableAlignOrientation"  
-ao.Attachment0 = att0  
-ao.Attachment1 = att1  
-ao.MaxTorque = Config.MaxTorque  
-ao.MaxAngularVelocity = math.huge  
-ao.Responsiveness = Config.Responsiveness  
-ao.ReactionTorqueEnabled = false  
-ao.RigidityEnabled = false  
-ao.Parent = Part0
-
-end
-
-local function respawnrequest()
-if not c or not c.Parent then return end
-local camera = Workspace.CurrentCamera
-if not camera then return end
-
-local oldCFrame = camera.CFrame  
-local oldCharacter = LocalPlayer.Character  
-LocalPlayer.Character = nil  
-LocalPlayer.Character = oldCharacter  
-
-if cameraConn then  
-	pcall(function()  
-		cameraConn:Disconnect()  
-	end)  
-	cameraConn = nil  
-end  
-
-cameraConn = camera.Changed:Connect(function(property)  
-	if property ~= "Parent" and property ~= "CFrame" then return end  
-	pcall(function()  
-		camera.CFrame = oldCFrame  
-	end)  
-	if cameraConn then  
-		cameraConn:Disconnect()  
-		cameraConn = nil  
-	end  
-end)  
-track(cameraConn)
-
-end
+local Stepped = RunService.Stepped
+local RenderStepped = RunService.RenderStepped
+local Heartbeat = RunService.Heartbeat
 
 local Character = LocalPlayer.Character
 if not Character or not Character.Parent then
-fullCleanup()
-return
+	return
 end
 
-c = Character
-track(c.Destroying:Connect(function()
-c = nil
-fullCleanup()
-end))
+local Settings = {
+	NoclipAllParts = false,
+	AntiRagdoll = true,
+	NewAnimate = true,
+	DisableCharacterScripts = true,
+	R15ToR6 = true,
+	HatCollide = false,
+	HumanoidState16 = true,
+	AddTools = false,
+	HeadAfterNeck = true,
+	LoadTime = Players.RespawnTime + 0.5,
+	Method = 3,
+	AlignMode = 3,
+	MaxForce = 1000000,
+	MaxTorque = 1000000,
+	Responsiveness = 200,
+	Friction = 0.8,
+	Density = 0.7
+}
 
-local destroyhum = Config.Method == 4 or Config.Method == 5
-local breakjoints = Config.Method == 0 or Config.Method == 4
-local antirespawn = Config.Method == 0 or Config.Method == 2 or Config.Method == 3
-local hatcollide = Config.HatCollide and Config.Method == 0
-
-if Config.AntiRagdoll then
-local function removeRagdollConstraint(v)
-if not v or not v.Parent then return end
-if v:IsA("HingeConstraint") or v:IsA("BallSocketConstraint") then
-safeDestroy(v)
-end
-end
-for _, v in ipairs(c:GetDescendants()) do
-removeRagdollConstraint(v)
-end
-track(c.DescendantAdded:Connect(removeRagdollConstraint))
-end
-
-if antirespawn then
-respawnrequest()
-end
-
-if Config.Method == 0 then
-task.wait(Config.LoadTime)
-if not active or not c or not c.Parent then
-fullCleanup()
-return
-end
-end
-
-if Config.DisableCharScripts then
-for _, v in ipairs(c:GetChildren()) do
-if v:IsA("LocalScript") then
-pcall(function()
-v.Disabled = true
+local c = Character
+c.Destroying:Connect(function()
+	c = nil
 end)
+
+local ZERO = Vector3.zero
+
+local function GetPart(parent, name, className)
+	if typeof(parent) ~= "Instance" then
+		return nil
+	end
+	for _, v in ipairs(parent:GetChildren()) do
+		if v.Name == name and v:IsA(className) then
+			return v
+		end
+	end
+	return nil
 end
+
+local function Align(Part0, Part1)
+	if not Part0 or not Part1 then
+		return
+	end
+	if not Part0:IsA("BasePart") or not Part1:IsA("BasePart") then
+		return
+	end
+
+	pcall(function()
+		Part0.CustomPhysicalProperties = PhysicalProperties.new(Settings.Density, Settings.Friction, 0, 1, 1)
+		Part0.CanCollide = false
+		Part0.CanTouch = false
+		Part0.CanQuery = false
+		Part0.Massless = true
+		Part0.AssemblyLinearVelocity = ZERO
+		Part0.AssemblyAngularVelocity = ZERO
+	end)
+
+	pcall(function()
+		Part1.CanCollide = false
+		Part1.CanTouch = false
+		Part1.CanQuery = false
+	end)
+
+	local att0 = Instance.new("Attachment")
+	att0.Name = "XStable_Att0_" .. Part0.Name
+	att0.Position = ZERO
+	att0.Orientation = ZERO
+	att0.Parent = Part0
+
+	local att1 = Instance.new("Attachment")
+	att1.Name = "XStable_Att1_" .. Part1.Name
+	att1.Position = ZERO
+	att1.Orientation = ZERO
+	att1.Parent = Part1
+
+	local ap = Instance.new("AlignPosition")
+	ap.Name = "XStableAlignPosition"
+	ap.Attachment0 = att0
+	ap.Attachment1 = att1
+	ap.ApplyAtCenterOfMass = true
+	ap.MaxForce = Settings.MaxForce
+	ap.MaxVelocity = math.huge
+	ap.Responsiveness = Settings.Responsiveness
+	ap.ReactionForceEnabled = false
+	ap.RigidityEnabled = false
+	ap.Parent = Part0
+
+	local ao = Instance.new("AlignOrientation")
+	ao.Name = "XStableAlignOrientation"
+	ao.Attachment0 = att0
+	ao.Attachment1 = att1
+	ao.MaxTorque = Settings.MaxTorque
+	ao.MaxAngularVelocity = math.huge
+	ao.Responsiveness = Settings.Responsiveness
+	ao.ReactionTorqueEnabled = false
+	ao.RigidityEnabled = false
+	ao.Parent = Part0
 end
-elseif Config.NewAnimate then
-local animate = gp(c, "Animate", "LocalScript")
-if animate and not animate.Disabled then
-animate.Disabled = true
-else
-Config.NewAnimate = false
+
+local function RespawnRequest()
+	if not c then
+		return
+	end
+	local camera = Workspace.CurrentCamera
+	if not camera then
+		return
+	end
+	local oldCFrame = camera.CFrame
+	local oldCharacter = LocalPlayer.Character
+	LocalPlayer.Character = nil
+	LocalPlayer.Character = oldCharacter
+	local connection
+	connection = camera.Changed:Connect(function(property)
+		if property ~= "Parent" and property ~= "CFrame" then
+			return
+		end
+		pcall(function()
+			camera.CFrame = oldCFrame
+		end)
+		if connection then
+			connection:Disconnect()
+			connection = nil
+		end
+	end)
 end
+
+local DestroyHumanoid = Settings.Method == 4 or Settings.Method == 5
+local BreakJoints = Settings.Method == 0 or Settings.Method == 4
+local AntiRespawn = Settings.Method == 0 or Settings.Method == 2 or Settings.Method == 3
+Settings.HatCollide = Settings.HatCollide and Settings.Method == 0
+
+if Settings.AntiRagdoll then
+	local function RemoveRagdollConstraint(v)
+		if not v or not v.Parent then
+			return
+		end
+		if v:IsA("HingeConstraint") or v:IsA("BallSocketConstraint") then
+			pcall(function()
+				v:Destroy()
+			end)
+		end
+	end
+
+	for _, v in ipairs(c:GetDescendants()) do
+		RemoveRagdollConstraint(v)
+	end
+
+	c.DescendantAdded:Connect(RemoveRagdollConstraint)
+end
+
+if AntiRespawn then
+	RespawnRequest()
+end
+
+if Settings.Method == 0 then
+	task.wait(Settings.LoadTime)
+	if not c then
+		return
+	end
+end
+
+if Settings.DisableCharacterScripts then
+	for _, v in ipairs(c:GetChildren()) do
+		if v:IsA("LocalScript") then
+			pcall(function()
+				v.Disabled = true
+			end)
+		end
+	end
+elseif Settings.NewAnimate then
+	local animate = GetPart(c, "Animate", "LocalScript")
+	if animate and not animate.Disabled then
+		animate.Disabled = true
+	else
+		Settings.NewAnimate = false
+	end
 end
 
 local Backpack
-if Config.AddTools then
-Backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+if Settings.AddTools then
+	Backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
 end
 
-if Config.AddTools and Backpack then
-for _, v in ipairs(Backpack:GetChildren()) do
-if v:IsA("Tool") then
-v.Parent = c
-end
-end
+if Settings.AddTools and Backpack then
+	for _, v in ipairs(Backpack:GetChildren()) do
+		if v:IsA("Tool") then
+			v.Parent = c
+		end
+	end
 end
 
 pcall(function()
-settings().Physics.AllowSleep = false
-settings().Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalPhysicsThrottle.Disabled
+	settings().Physics.AllowSleep = false
+	settings().Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalPhysicsThrottle.Disabled
 end)
 
-local OLDscripts = {}
+local OldScripts = {}
 for _, v in ipairs(c:GetDescendants()) do
-if v.ClassName == "Script" then
-table.insert(OLDscripts, v)
-end
+	if v.ClassName == "Script" then
+		table.insert(OldScripts, v)
+	end
 end
 
-local scriptNames = {}
+local ScriptNames = {}
 for i, v in ipairs(c:GetDescendants()) do
-if v:IsA("BasePart") then
-local newName = tostring(i)
-local exists = true
-while exists do
-exists = false
-for , oldScript in ipairs(OLDscripts) do
-if oldScript.Name == newName then
-exists = true
-newName = newName .. ""
-break
-end
-end
-end
-table.insert(scriptNames, newName)
-local marker = Instance.new("Script")
-marker.Name = newName
-marker.Parent = v
-end
+	if v:IsA("BasePart") then
+		local newName = tostring(i)
+		local exists = true
+		while exists do
+			exists = false
+			for _, oldScript in ipairs(OldScripts) do
+				if oldScript.Name == newName then
+					exists = true
+					newName = newName .. "_"
+					break
+				end
+			end
+		end
+		table.insert(ScriptNames, newName)
+		local marker = Instance.new("Script")
+		marker.Name = newName
+		marker.Parent = v
+	end
 end
 
 c.Archivable = true
 
 local hum = c:FindFirstChildOfClass("Humanoid")
 if hum then
-for _, trackAnim in ipairs(hum:GetPlayingAnimationTracks()) do
-pcall(function()
-trackAnim:Stop()
-end)
-end
+	for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
+		pcall(function()
+			track:Stop()
+		end)
+	end
 end
 
 local cl = c:Clone()
 if not cl then
-fullCleanup()
-return
+	return
 end
+
 cl.Name = LocalPlayer.Name
 
-if hum and Config.HumState16 then
-pcall(function()
-hum:ChangeState(Enum.HumanoidStateType.Physics)
-end)
-if destroyhum then
-task.wait(1.6)
-if not active or not c or not c.Parent then
-fullCleanup()
-return
-end
-end
+if hum and Settings.HumanoidState16 then
+	pcall(function()
+		hum:ChangeState(Enum.HumanoidStateType.Physics)
+	end)
+	if DestroyHumanoid then
+		task.wait(1.6)
+	end
 end
 
-if hum and hum.Parent and destroyhum then
-safeDestroy(hum)
+if hum and hum.Parent and DestroyHumanoid then
+	pcall(function()
+		hum:Destroy()
+	end)
 end
 
-if not active or not c or not c.Parent then
-fullCleanup()
-return
+if not c then
+	return
 end
 
-local head = gp(c, "Head", "BasePart")
-local torso = gp(c, "Torso", "BasePart") or gp(c, "UpperTorso", "BasePart")
-local root = gp(c, "HumanoidRootPart", "BasePart")
+local head = GetPart(c, "Head", "BasePart")
+local torso = GetPart(c, "Torso", "BasePart") or GetPart(c, "UpperTorso", "BasePart")
+local root = GetPart(c, "HumanoidRootPart", "BasePart")
 
-if hatcollide and c:FindFirstChildOfClass("Accessory") then
-local anything = c:FindFirstChildOfClass("BodyColors") or gp(c, "Health", "Script")
-if not torso or not root or not anything then
-fullCleanup()
-return
-end
-safeDestroy(torso)
-safeDestroy(root)
-safeDestroy(anything)
+if Settings.HatCollide and c:FindFirstChildOfClass("Accessory") then
+	local anything = c:FindFirstChildOfClass("BodyColors") or GetPart(c, "Health", "Script")
+	if not torso or not root or not anything then
+		return
+	end
+	pcall(function()
+		torso:Destroy()
+		root:Destroy()
+	end)
+	anything:Destroy()
 end
 
 for _, v in ipairs(cl:GetDescendants()) do
-if v:IsA("BasePart") then
-v.Transparency = 1
-v.Anchored = false
-pcall(function()
-v.CanCollide = false
-v.CanTouch = false
-v.CanQuery = false
-v.Massless = true
-end)
-end
+	if v:IsA("BasePart") then
+		v.Transparency = 1
+		v.Anchored = false
+		pcall(function()
+			v.CanCollide = false
+			v.CanTouch = false
+			v.CanQuery = false
+			v.Massless = true
+		end)
+	end
 end
 
-model = Instance.new("Model")
+local model = Instance.new("Model")
 model.Name = "ReanimateModel"
 model.Parent = c
-track(model.Destroying:Connect(function()
-model = nil
-end))
+
+model.Destroying:Connect(function()
+	model = nil
+end)
 
 for _, v in ipairs(c:GetChildren()) do
-if v ~= model then
-if Config.AddTools and v:IsA("Tool") then
-for _, v1 in ipairs(v:GetDescendants()) do
-if v1:IsA("BasePart") then
-local bv = Instance.new("BodyVelocity")
-bv.Velocity = ZERO
-bv.MaxForce = Vector3.new(1000, 1000, 1000)
-bv.P = 1250
-bv.Name = "StableToolVelocity"
-bv.Parent = v1
-end
-end
-end
-v.Parent = model
-end
-end
-
-if breakjoints then
-if model then
-model:BreakJoints()
-end
-else
-if head and torso and model then
-for _, v in ipairs(model:GetDescendants()) do
-if v:IsA("Weld") or v:IsA("Snap") or v:IsA("Glue") or v:IsA("Motor") or v:IsA("Motor6D") then
-local save = (v.Part0 == torso and v.Part1 == head) or (v.Part0 == head and v.Part1 == torso)
-if save then
-if Config.HeadAfterNeck then
-Config.HeadAfterNeck = v
-end
-else
-safeDestroy(v)
-end
-end
-end
-end
-if Config.Method == 3 then
-task.spawn(function()
-task.wait(Config.LoadTime)
-if active and model and model.Parent then
-pcall(function()
-model:BreakJoints()
-end)
-end
-end)
-end
+	if v ~= model then
+		if Settings.AddTools and v:IsA("Tool") then
+			for _, v1 in ipairs(v:GetDescendants()) do
+				if v1:IsA("BasePart") then
+					local bv = Instance.new("BodyVelocity")
+					bv.Velocity = ZERO
+					bv.MaxForce = Vector3.new(1000, 1000, 1000)
+					bv.P = 1250
+					bv.Name = "StableToolVelocity"
+					bv.Parent = v1
+				end
+			end
+		end
+		v.Parent = model
+	end
 end
 
-if not active or not c or not c.Parent then
-fullCleanup()
-return
+if BreakJoints then
+	model:BreakJoints()
+else
+	if head and torso then
+		for _, v in ipairs(model:GetDescendants()) do
+			if v:IsA("Weld") or v:IsA("Snap") or v:IsA("Glue") or v:IsA("Motor") or v:IsA("Motor6D") then
+				local save = false
+				if v.Part0 == torso and v.Part1 == head then
+					save = true
+				end
+				if v.Part0 == head and v.Part1 == torso then
+					save = true
+				end
+				if save then
+					if Settings.HeadAfterNeck then
+						Settings.HeadAfterNeck = v
+					end
+				else
+					pcall(function()
+						v:Destroy()
+					end)
+				end
+			end
+		end
+	end
+
+	if Settings.Method == 3 then
+		task.spawn(function()
+			task.wait(Settings.LoadTime)
+			if model then
+				pcall(function()
+					model:BreakJoints()
+				end)
+			end
+		end)
+	end
 end
 
 cl.Parent = c
 for _, v in ipairs(cl:GetChildren()) do
-v.Parent = c
+	v.Parent = c
 end
-safeDestroy(cl)
+cl:Destroy()
 
-local function buildCache(target)
-cachedParts = {}
-if not target or not target.Parent then return end
-for _, v in ipairs(target:GetDescendants()) do
-if v:IsA("BasePart") then
-table.insert(cachedParts, v)
-end
-end
-end
+local noclipmodel = (Settings.NoclipAllParts and c) or model
+local noclipcon
 
-local noclipTarget = (Config.NoclipAllParts and c) or model
-buildCache(noclipTarget)
-
-local function uncollide()
-if not active then return end
-for _, v in ipairs(cachedParts) do
-if v and v.Parent then
-pcall(function()
-v.CanCollide = false
-v.CanTouch = false
-v.CanQuery = false
-v.Massless = true
-end)
-end
-end
+local function Uncollide()
+	if not noclipmodel then
+		return
+	end
+	for _, v in ipairs(noclipmodel:GetDescendants()) do
+		if v:IsA("BasePart") then
+			pcall(function()
+				v.CanCollide = false
+				v.CanTouch = false
+				v.CanQuery = false
+				v.Massless = true
+			end)
+		end
+	end
 end
 
-if Config.NoclipAllParts then
-track(RunService.Stepped:Connect(function()
-if not active then return end
-uncollide()
-end))
-uncollide()
-end
+noclipcon = Stepped:Connect(Uncollide)
+Uncollide()
 
 for _, scr in ipairs(model:GetDescendants()) do
-if scr.ClassName == "Script" and table.find(scriptNames, scr.Name) then
-local Part0 = scr.Parent
-if Part0 and Part0:IsA("BasePart") and Part0.Parent then
-for _, scr1 in ipairs(c:GetDescendants()) do
-if scr1.ClassName == "Script"
-and scr1.Name == scr.Name
-and not scr1:IsDescendantOf(model) then
-local Part1 = scr1.Parent
-if Part1 and Part1:IsA("BasePart") and Part1.Name == Part0.Name and Part1.Parent then
-align(Part0, Part1)
-break
-end
-end
-end
-end
-end
+	if scr.ClassName == "Script" and table.find(ScriptNames, scr.Name) then
+		local Part0 = scr.Parent
+		if Part0 and Part0:IsA("BasePart") then
+			for _, scr1 in ipairs(c:GetDescendants()) do
+				if scr1.ClassName == "Script" and scr1.Name == scr.Name and not scr1:IsDescendantOf(model) then
+					local Part1 = scr1.Parent
+					if Part1 and Part1:IsA("BasePart") and Part1.Name == Part0.Name then
+						Align(Part0, Part1)
+						break
+					end
+				end
+			end
+		end
+	end
 end
 
 for _, v in ipairs(c:GetDescendants()) do
-if v and v.Parent then
-if v.ClassName == "Script" then
-if table.find(scriptNames, v.Name) then
-safeDestroy(v)
-end
-elseif not v:IsDescendantOf(model) then
-if v:IsA("Decal") then
-v.Transparency = 1
-elseif v:IsA("ForceField") then
-v.Visible = false
-elseif v:IsA("Sound") then
-v.Playing = false
-elseif v:IsA("BillboardGui") or v:IsA("SurfaceGui") or v:IsA("ParticleEmitter")
-or v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Sparkles") then
-v.Enabled = false
-end
-end
-end
-end
-
-if Config.NewAnimate then
-local animate = gp(c, "Animate", "LocalScript")
-if animate then
-pcall(function()
-animate.Disabled = false
-end)
-end
+	if v and v.Parent then
+		if v.ClassName == "Script" then
+			if table.find(ScriptNames, v.Name) then
+				pcall(function()
+					v:Destroy()
+				end)
+			end
+		elseif not v:IsDescendantOf(model) then
+			if v:IsA("Decal") then
+				v.Transparency = 1
+			elseif v:IsA("ForceField") then
+				v.Visible = false
+			elseif v:IsA("Sound") then
+				v.Playing = false
+			elseif v:IsA("BillboardGui") or v:IsA("SurfaceGui") or v:IsA("ParticleEmitter") or v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Sparkles") then
+				v.Enabled = false
+			end
+		end
+	end
 end
 
-if Config.AddTools and Backpack then
-for _, v in ipairs(c:GetChildren()) do
-if v:IsA("Tool") then
-v.Parent = Backpack
-end
-end
+if Settings.NewAnimate then
+	local animate = GetPart(c, "Animate", "LocalScript")
+	if animate then
+		pcall(function()
+			animate.Disabled = false
+		end)
+	end
 end
 
-hum0 = model and model:FindFirstChildOfClass("Humanoid")
+if Settings.AddTools and Backpack then
+	for _, v in ipairs(c:GetChildren()) do
+		if v:IsA("Tool") then
+			v.Parent = Backpack
+		end
+	end
+end
+
+local hum0 = model:FindFirstChildOfClass("Humanoid")
 if hum0 then
-track(hum0.Destroying:Connect(function()
-hum0 = nil
-end))
+	hum0.Destroying:Connect(function()
+		hum0 = nil
+	end)
 end
 
-hum1 = c:FindFirstChildOfClass("Humanoid")
+local hum1 = c:FindFirstChildOfClass("Humanoid")
 if hum1 then
-track(hum1.Destroying:Connect(function()
-hum1 = nil
-end))
+	hum1.Destroying:Connect(function()
+		hum1 = nil
+	end)
 end
 
 if hum1 then
-pcall(function()
-Workspace.CurrentCamera.CameraSubject = hum1
-end)
+	pcall(function()
+		Workspace.CurrentCamera.CameraSubject = hum1
+	end)
 
-local camConn  
-camConn = RunService.RenderStepped:Connect(function()  
-	if not active or not c or not hum1 or not hum1.Parent then  
-		if camConn then  
-			camConn:Disconnect()  
-		end  
-		return  
-	end  
-	pcall(function()  
-		Workspace.CurrentCamera.CameraSubject = hum1  
-	end)  
-end)  
-track(camConn)  
+	local camSubCon
+	local function CamSubFunc()
+		if camSubCon then
+			camSubCon:Disconnect()
+			camSubCon = nil
+		end
+		if c and hum1 then
+			pcall(function()
+				Workspace.CurrentCamera.CameraSubject = hum1
+			end)
+		end
+	end
 
-if hum0 then  
-	track(hum0:GetPropertyChangedSignal("Jump"):Connect(function()  
-		if active and hum1 and hum1.Parent then  
-			pcall(function()  
-				hum1.Jump = hum0.Jump  
-			end)  
-		end  
-	end))  
-else  
-	respawnrequest()  
+	camSubCon = RenderStepped:Connect(CamSubFunc)
+
+	if hum0 then
+		hum0:GetPropertyChangedSignal("Jump"):Connect(function()
+			if hum1 then
+				pcall(function()
+					hum1.Jump = hum0.Jump
+				end)
+			end
+		end)
+	else
+		RespawnRequest()
+	end
 end
 
-end
-
-rb = Instance.new("BindableEvent")
+local rb = Instance.new("BindableEvent")
 rb.Name = "ReanimateReset"
 rb.Parent = c
 
-track(rb.Event:Connect(function()
-active = false
+rb.Event:Connect(function()
+	pcall(function()
+		rb:Destroy()
+	end)
+	pcall(function()
+		StarterGui:SetCore("ResetButtonCallback", true)
+	end)
 
-if destroyhum and c and c.Parent then  
-	pcall(function()  
-		c:BreakJoints()  
-	end)  
-elseif hum0 and hum0.Parent and hum0.Health > 0 then  
-	if model and model.Parent then  
-		pcall(function()  
-			model:BreakJoints()  
-		end)  
-	end  
-	pcall(function()  
-		hum0.Health = 0  
-	end)  
-end  
+	if DestroyHumanoid then
+		pcall(function()
+			c:BreakJoints()
+		end)
+		return
+	end
 
-if antirespawn then  
-	respawnrequest()  
-end  
+	if hum0 and hum0.Health > 0 then
+		pcall(function()
+			model:BreakJoints()
+		end)
+		pcall(function()
+			hum0.Health = 0
+		end)
+	end
 
-task.delay(0.3, fullCleanup)
-
-end))
-
-pcall(function()
-StarterGui:SetCore("ResetButtonCallback", rb)
+	if AntiRespawn then
+		RespawnRequest()
+	end
 end)
 
-if Config.Notification then
 pcall(function()
-StarterGui:SetCore("SendNotification", {
-Title = "XReanimateV3",
-Text = "By LeoV1 Or 123",
-Duration = 4
-})
+	StarterGui:SetCore("ResetButtonCallback", rb)
 end)
-end
+
+task.spawn(function()
+	while c do
+		if hum0 and hum1 then
+			pcall(function()
+				hum1.Jump = hum0.Jump
+			end)
+		end
+		task.wait()
+	end
+	pcall(function()
+		StarterGui:SetCore("ResetButtonCallback", true)
+	end)
+end)
+
+pcall(function()
+	StarterGui:SetCore("SendNotification", {
+		Title = "XReanimate V2",
+		Text = "Method:By Leo",
+		Duration = 5
+	})
+end)
