@@ -6,6 +6,7 @@ local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local Stepped = RunService.Stepped
 local RenderStepped = RunService.RenderStepped
+local Heartbeat = RunService.Heartbeat
 
 local Character = LocalPlayer.Character
 if not Character or not Character.Parent then
@@ -30,8 +31,8 @@ local Settings = {
 	Responsiveness = 200,
 	Friction = 0.8,
 	Density = 0.7,
-	ToolHoldForce = 4000,
-	ToolHoldP = 3000
+	ToolHoldForce = 25000,
+	ToolHoldP = 12000
 }
 
 local c = Character
@@ -114,7 +115,7 @@ local function Align(Part0, Part1)
 end
 
 local function StabilizeTool(tool)
-	if not tool or not tool:IsA("Tool") then
+	if not tool or not tool:IsA("Tool") or not tool.Parent then
 		return
 	end
 
@@ -125,14 +126,14 @@ local function StabilizeTool(tool)
 				part.CanTouch = false
 				part.CanQuery = false
 				part.Massless = true
-				part.CustomPhysicalProperties = PhysicalProperties.new(0.3, 0.5, 0, 1, 1)
+				part.CustomPhysicalProperties = PhysicalProperties.new(0.4, 0.6, 0, 1, 1)
 				part.AssemblyLinearVelocity = ZERO
 				part.AssemblyAngularVelocity = ZERO
 			end)
 
-			local existing = part:FindFirstChild("XToolStableVelocity")
-			if existing then
-				existing:Destroy()
+			local oldBV = part:FindFirstChild("XToolStableVelocity")
+			if oldBV then
+				oldBV:Destroy()
 			end
 
 			local bv = Instance.new("BodyVelocity")
@@ -141,6 +142,27 @@ local function StabilizeTool(tool)
 			bv.MaxForce = Vector3.new(Settings.ToolHoldForce, Settings.ToolHoldForce, Settings.ToolHoldForce)
 			bv.P = Settings.ToolHoldP
 			bv.Parent = part
+		end
+	end
+end
+
+local function KeepToolsStable()
+	if not c then
+		return
+	end
+
+	for _, tool in ipairs(c:GetChildren()) do
+		if tool:IsA("Tool") then
+			StabilizeTool(tool)
+		end
+	end
+
+	local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+	if backpack then
+		for _, tool in ipairs(backpack:GetChildren()) do
+			if tool:IsA("Tool") then
+				StabilizeTool(tool)
+			end
 		end
 	end
 end
@@ -524,7 +546,9 @@ end
 
 local function OnToolEquipped(tool)
 	if tool and tool:IsA("Tool") then
-		StabilizeTool(tool)
+		task.defer(function()
+			StabilizeTool(tool)
+		end)
 	end
 end
 
@@ -544,6 +568,18 @@ if c then
 	end)
 end
 
+local toolStableCon
+toolStableCon = Heartbeat:Connect(function()
+	if not c then
+		if toolStableCon then
+			toolStableCon:Disconnect()
+			toolStableCon = nil
+		end
+		return
+	end
+	KeepToolsStable()
+end)
+
 local rb = Instance.new("BindableEvent")
 rb.Name = "ReanimateReset"
 rb.Parent = c
@@ -555,6 +591,11 @@ rb.Event:Connect(function()
 	pcall(function()
 		StarterGui:SetCore("ResetButtonCallback", true)
 	end)
+
+	if toolStableCon then
+		toolStableCon:Disconnect()
+		toolStableCon = nil
+	end
 
 	if DestroyHumanoid then
 		pcall(function()
@@ -597,8 +638,8 @@ end)
 
 pcall(function()
 	StarterGui:SetCore("SendNotification", {
-		Title = "XReanimateV2.1",
-		Text = "method:Leo,CrazeScript",
+		Title = "XReanimateV2.2",
+		Text = "method:Leo,CrazeScript,Rex",
 		Duration = 5
 	})
 end)
