@@ -1,16 +1,13 @@
 --[[
 	ToolxUI Library v3.0 "Omni"
 	By LeoV1 And Rex
-	350+ Working Functions — Better than every UI Library out there
+	350+ Working Functions
 ]]
 
 local ToolxUI = {}
 ToolxUI.__index = ToolxUI
 ToolxUI._version = "3.0"
 
--- =========================================================================
--- SERVICES
--- =========================================================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -18,20 +15,9 @@ local UIS = game:GetService("UserInputService")
 local SoundService = game:GetService("SoundService")
 local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
-local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
-local TeleportService = game:GetService("TeleportService")
-local StarterGui = game:GetService("StarterGui")
-local ContextActionService = game:GetService("ContextActionService")
-local GuiService = game:GetService("GuiService")
-local CollectionService = game:GetService("CollectionService")
-local TextService = game:GetService("TextService")
-local Debris = game:GetService("Debris")
 local lp = Players.LocalPlayer
 
--- =========================================================================
--- SAFE UTILITIES
--- =========================================================================
 local function safe(fn, ...)
 	local ok, res = pcall(fn, ...)
 	if not ok then warn("[ToolxUI]", res) end
@@ -44,74 +30,64 @@ local function getParent()
 end
 local function isAlive(plr)
 	plr = plr or lp
-	return plr and plr.Character and plr.Character:FindFirstChildOfClass("Humanoid") and plr.Character:FindFirstChildOfClass("Humanoid").Health > 0
+	local h = plr and plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
+	return h and h.Health > 0
 end
 
--- =========================================================================
--- COLOR UTILITIES (25+)
--- =========================================================================
+-- ============= COLOR UTILS =============
 local CU = {}
-function CU.brighten(c, a) return Color3.fromRGB(math.min(c.R*255+a,255), math.min(c.G*255+a,255), math.min(c.B*255+a,255)) end
-function CU.darken(c, s) return Color3.fromRGB(math.max(c.R*255-s,0), math.max(c.G*255-s,0), math.max(c.B*255-s,0)) end
-function CU.lerp(a, b, t) return Color3.new(a.R+(b.R-a.R)*t, a.G+(b.G-a.G)*t, a.B+(b.B-a.B)*t) end
-function CU.fromRGB(r,g,b) return Color3.fromRGB(r,g,b) end
-function CU.fromHex(hex)
-	hex = hex:gsub("#","")
-	local r = tonumber(hex:sub(1,2), 16) or 0
-	local g = tonumber(hex:sub(3,4), 16) or 0
-	local b = tonumber(hex:sub(5,6), 16) or 0
-	return Color3.fromRGB(r,g,b)
+function CU.brighten(c,a) return Color3.fromRGB(math.min(c.R*255+a,255),math.min(c.G*255+a,255),math.min(c.B*255+a,255)) end
+function CU.darken(c,s) return Color3.fromRGB(math.max(c.R*255-s,0),math.max(c.G*255-s,0),math.max(c.B*255-s,0)) end
+function CU.lerp(a,b,t) return Color3.new(a.R+(b.R-a.R)*t,a.G+(b.G-a.G)*t,a.B+(b.B-a.B)*t) end
+function CU.fromHex(h)
+	h = h:gsub("#","")
+	return Color3.fromRGB(tonumber(h:sub(1,2),16) or 0, tonumber(h:sub(3,4),16) or 0, tonumber(h:sub(5,6),16) or 0)
 end
 function CU.toHex(c) return string.format("#%02X%02X%02X", math.floor(c.R*255), math.floor(c.G*255), math.floor(c.B*255)) end
 function CU.fromHSV(h,s,v) return Color3.fromHSV(h,s,v) end
 function CU.toHSV(c) return c:ToHSV() end
-function CU.random() return Color3.fromRGB(math.random(0,255), math.random(0,255), math.random(0,255)) end
-function CU.gradient(color1, color2, steps)
+function CU.random() return Color3.fromRGB(math.random(0,255),math.random(0,255),math.random(0,255)) end
+function CU.gradient(c1,c2,steps)
 	local t = {}
-	for i = 1, steps do t[i] = CU.lerp(color1, color2, (i-1)/(steps-1)) end
+	for i = 1, steps do t[i] = CU.lerp(c1,c2,(i-1)/(steps-1)) end
 	return t
 end
 function CU.complementary(c)
 	local h,s,v = c:ToHSV()
 	return Color3.fromHSV((h+0.5)%1, s, v)
 end
-function CU.invert(c) return Color3.new(1-c.R, 1-c.G, 1-c.B) end
+function CU.invert(c) return Color3.new(1-c.R,1-c.G,1-c.B) end
 function CU.grayscale(c)
-	local avg = (c.R + c.G + c.B) / 3
-	return Color3.new(avg, avg, avg)
+	local a = (c.R+c.G+c.B)/3
+	return Color3.new(a,a,a)
 end
-function CU.isDark(c) return (c.R*0.299 + c.G*0.587 + c.B*0.114) < 0.5 end
+function CU.isDark(c) return (c.R*0.299+c.G*0.587+c.B*0.114) < 0.5 end
 function CU.isLight(c) return not CU.isDark(c) end
 function CU.contrastText(bg) return CU.isDark(bg) and Color3.new(1,1,1) or Color3.new(0,0,0) end
-function CU.warm(c) return Color3.new(math.min(c.R*1.2,1), c.G, math.max(c.B*0.8,0)) end
-function CU.cool(c) return Color3.new(math.max(c.R*0.8,0), c.G, math.min(c.B*1.2,1)) end
-function CU.saturate(c, amount)
+function CU.saturate(c,a)
 	local h,s,v = c:ToHSV()
-	return Color3.fromHSV(h, math.clamp(s+amount,0,1), v)
+	return Color3.fromHSV(h, math.clamp(s+a,0,1), v)
 end
-function CU.desaturate(c, amount) return CU.saturate(c, -amount) end
-function CU.blend(a, b, alpha) return CU.lerp(a, b, alpha) end
-function CU.tint(c, t) return CU.lerp(c, t, 0.5) end
-function CU.shift(c) return Color3.new(c.B, c.R, c.G) end
-function CU.equals(a, b, tol)
+function CU.desaturate(c,a) return CU.saturate(c,-a) end
+function CU.blend(a,b,alpha) return CU.lerp(a,b,alpha) end
+function CU.shift(c) return Color3.new(c.B,c.R,c.G) end
+function CU.equals(a,b,tol)
 	tol = tol or 0.01
 	return math.abs(a.R-b.R)<tol and math.abs(a.G-b.G)<tol and math.abs(a.B-b.B)<tol
 end
 ToolxUI.ColorUtils = CU
 
--- =========================================================================
--- MATH / VECTOR UTILITIES (30+)
--- =========================================================================
+-- ============= MATH UTILS =============
 local MU = {}
 function MU.clamp(v,a,b) return math.max(a, math.min(b, v)) end
 function MU.round(n) return math.floor(n+0.5) end
-function MU.roundTo(n, dp)
+function MU.roundTo(n,dp)
 	local m = 10^dp
 	return math.floor(n*m+0.5)/m
 end
 function MU.lerp(a,b,t) return a + (b-a)*t end
 function MU.inverseLerp(a,b,v) if a==b then return 0 end; return (v-a)/(b-a) end
-function MU.map(v, inMin, inMax, outMin, outMax) return outMin + (v-inMin)*(outMax-outMin)/(inMax-inMin) end
+function MU.map(v,inMin,inMax,outMin,outMax) return outMin + (v-inMin)*(outMax-outMin)/(inMax-inMin) end
 function MU.sign(n) return n > 0 and 1 or (n < 0 and -1 or 0) end
 function MU.distance(a,b) return (a-b).Magnitude end
 function MU.distance2D(a,b) return (Vector2.new(a.X,a.Z)-Vector2.new(b.X,b.Z)).Magnitude end
@@ -121,21 +97,21 @@ function MU.randomInt(a,b) return math.random(a,b) end
 function MU.randomVector(a,b)
 	return Vector3.new(MU.randomFloat(a.X,b.X), MU.randomFloat(a.Y,b.Y), MU.randomFloat(a.Z,b.Z))
 end
-function MU.smooth(current, target, speed, dt)
-	return current + (target-current) * math.clamp(speed*dt*60, 0, 1)
+function MU.smooth(cur, tgt, speed, dt)
+	return cur + (tgt-cur) * math.clamp(speed*dt*60, 0, 1)
 end
-function MU.moveTowards(a, b, maxDelta)
+function MU.moveTowards(a,b,maxDelta)
 	local d = b - a
 	if d.Magnitude <= maxDelta then return b end
 	return a + d.Unit * maxDelta
 end
-function MU.wrap(n, min, max)
+function MU.wrap(n,min,max)
 	local r = max - min
 	return min + ((n - min) % r + r) % r
 end
 function MU.isPowerOfTwo(n) return n > 0 and (n & (n-1)) == 0 end
-function MU.gcd(a, b) while b ~= 0 do a, b = b, a % b end; return a end
-function MU.lcm(a, b) return a * b / MU.gcd(a, b) end
+function MU.gcd(a,b) while b ~= 0 do a, b = b, a % b end; return a end
+function MU.lcm(a,b) return a * b / MU.gcd(a,b) end
 function MU.factorial(n) local r = 1; for i = 2, n do r = r * i end; return r end
 function MU.fibonacci(n)
 	if n < 2 then return n end
@@ -150,38 +126,23 @@ function MU.isPrime(n)
 end
 function MU.degrees(r) return math.deg(r) end
 function MU.radians(d) return math.rad(d) end
-function MU.sin(d) return math.sin(d) end
-function MU.cos(d) return math.cos(d) end
-function MU.tan(d) return math.tan(d) end
-function MU.atan2(y,x) return math.atan2(y,x) end
-function MU.sqrt(n) return math.sqrt(n) end
-function MU.pow(a,b) return a^b end
-function MU.log(n, base) return math.log(n, base) end
-function MU.exp(n) return math.exp(n) end
-function MU.abs(n) return math.abs(n) end
-function MU.floor(n) return math.floor(n) end
-function MU.ceil(n) return math.ceil(n) end
-function MU.max(...) return math.max(...) end
-function MU.min(...) return math.min(...) end
 function MU.sum(t)
 	local s = 0
-	for _, v in ipairs(t) do s = s + v end
+	for _,v in ipairs(t) do s = s + v end
 	return s
 end
 function MU.avg(t) return MU.sum(t) / #t end
 function MU.median(t)
 	local c = {}
-	for i, v in ipairs(t) do c[i] = v end
+	for i,v in ipairs(t) do c[i] = v end
 	table.sort(c)
 	local n = #c
-	if n % 2 == 0 then return (c[n/2] + c[n/2+1]) / 2 end
+	if n % 2 == 0 then return (c[n/2]+c[n/2+1])/2 end
 	return c[math.ceil(n/2)]
 end
 ToolxUI.MathUtils = MU
 
--- =========================================================================
--- TABLE UTILITIES (20+)
--- =========================================================================
+-- ============= TABLE UTILS =============
 local TU = {}
 function TU.copy(t)
 	local n = {}
@@ -191,24 +152,23 @@ end
 function TU.deepCopy(t)
 	local n = {}
 	for k,v in pairs(t) do
-		if type(v) == "table" then n[k] = TU.deepCopy(v)
-		else n[k] = v end
+		if type(v) == "table" then n[k] = TU.deepCopy(v) else n[k] = v end
 	end
 	return n
 end
-function TU.merge(a, b)
+function TU.merge(a,b)
 	local n = TU.copy(a)
 	for k,v in pairs(b) do n[k] = v end
 	return n
 end
 function TU.keys(t)
 	local o = {}
-	for k in pairs(t) do table.insert(o, k) end
+	for k in pairs(t) do table.insert(o,k) end
 	return o
 end
 function TU.values(t)
 	local o = {}
-	for _, v in pairs(t) do table.insert(o, v) end
+	for _,v in pairs(t) do table.insert(o,v) end
 	return o
 end
 function TU.size(t)
@@ -216,32 +176,32 @@ function TU.size(t)
 	for _ in pairs(t) do n = n + 1 end
 	return n
 end
-function TU.contains(t, v)
-	for _, x in ipairs(t) do if x == v then return true end end
+function TU.contains(t,v)
+	for _,x in ipairs(t) do if x == v then return true end end
 	return false
 end
-function TU.containsKey(t, k) return t[k] ~= nil end
-function TU.find(t, fn)
-	for i, v in ipairs(t) do if fn(v, i) then return i, v end end
+function TU.containsKey(t,k) return t[k] ~= nil end
+function TU.find(t,fn)
+	for i,v in ipairs(t) do if fn(v,i) then return i,v end end
 end
-function TU.filter(t, fn)
+function TU.filter(t,fn)
 	local o = {}
-	for i, v in ipairs(t) do if fn(v, i) then table.insert(o, v) end end
+	for i,v in ipairs(t) do if fn(v,i) then table.insert(o,v) end end
 	return o
 end
-function TU.map(t, fn)
+function TU.map(t,fn)
 	local o = {}
-	for i, v in ipairs(t) do o[i] = fn(v, i) end
+	for i,v in ipairs(t) do o[i] = fn(v,i) end
 	return o
 end
-function TU.reduce(t, fn, init)
+function TU.reduce(t,fn,init)
 	local acc = init
-	for i, v in ipairs(t) do acc = fn(acc, v, i) end
+	for i,v in ipairs(t) do acc = fn(acc,v,i) end
 	return acc
 end
 function TU.reverse(t)
 	local o = {}
-	for i = #t, 1, -1 do table.insert(o, t[i]) end
+	for i = #t, 1, -1 do table.insert(o,t[i]) end
 	return o
 end
 function TU.shuffle(t)
@@ -254,320 +214,304 @@ function TU.shuffle(t)
 end
 function TU.unique(t)
 	local seen, o = {}, {}
-	for _, v in ipairs(t) do
-		if not seen[v] then seen[v] = true; table.insert(o, v) end
+	for _,v in ipairs(t) do
+		if not seen[v] then seen[v] = true; table.insert(o,v) end
 	end
 	return o
 end
 function TU.flatten(t)
 	local o = {}
-	for _, v in ipairs(t) do
+	for _,v in ipairs(t) do
 		if type(v) == "table" then
-			for _, s in ipairs(TU.flatten(v)) do table.insert(o, s) end
-		else table.insert(o, v) end
+			for _,s in ipairs(TU.flatten(v)) do table.insert(o,s) end
+		else table.insert(o,v) end
 	end
 	return o
 end
 function TU.first(t) return t[1] end
 function TU.last(t) return t[#t] end
-function TU.sort(t, fn) local o = TU.copy(t); table.sort(o, fn); return o end
-function TU.count(t, fn)
+function TU.sort(t,fn) local o = TU.copy(t); table.sort(o,fn); return o end
+function TU.count(t,fn)
 	local n = 0
-	for i, v in ipairs(t) do if fn(v, i) then n = n + 1 end end
+	for i,v in ipairs(t) do if fn(v,i) then n = n + 1 end end
 	return n
 end
-function TU.zip(a, b)
+function TU.zip(a,b)
 	local o = {}
-	for i = 1, math.min(#a, #b) do o[i] = {a[i], b[i]} end
+	for i = 1, math.min(#a,#b) do o[i] = {a[i], b[i]} end
 	return o
 end
 ToolxUI.TableUtils = TU
 
--- =========================================================================
--- STRING UTILITIES (20+)
--- =========================================================================
+-- ============= STRING UTILS =============
 local SU = {}
-function SU.split(s, sep)
+function SU.split(s,sep)
 	local o = {}
-	for part in string.gmatch(s, "([^"..sep.."]+)") do table.insert(o, part) end
+	for p in string.gmatch(s, "([^"..sep.."]+)") do table.insert(o,p) end
 	return o
 end
 function SU.trim(s) return s:match("^%s*(.-)%s*$") end
-function SU.startsWith(s, p) return s:sub(1, #p) == p end
-function SU.endsWith(s, p) return s:sub(-#p) == p end
-function SU.contains(s, p) return s:find(p, 1, true) ~= nil end
-function SU.replace(s, a, b) return s:gsub(a, b) end
+function SU.startsWith(s,p) return s:sub(1,#p) == p end
+function SU.endsWith(s,p) return s:sub(-#p) == p end
+function SU.contains(s,p) return s:find(p,1,true) ~= nil end
+function SU.replace(s,a,b) return s:gsub(a,b) end
 function SU.upper(s) return s:upper() end
 function SU.lower(s) return s:lower() end
 function SU.capitalize(s) return s:sub(1,1):upper()..s:sub(2):lower() end
 function SU.reverse(s) return s:reverse() end
-function SU.repeatStr(s, n) return string.rep(s, n) end
-function SU.padLeft(s, n, c) c = c or " "; while #s < n do s = c..s end; return s end
-function SU.padRight(s, n, c) c = c or " "; while #s < n do s = s..c end; return s end
+function SU.repeatStr(s,n) return string.rep(s,n) end
+function SU.padLeft(s,n,c) c = c or " "; while #s < n do s = c..s end; return s end
+function SU.padRight(s,n,c) c = c or " "; while #s < n do s = s..c end; return s end
 function SU.format(fmt, ...) return string.format(fmt, ...) end
 function SU.len(s) return #s end
 function SU.toNumber(s) return tonumber(s) end
-function SU.join(t, sep) return table.concat(t, sep or ", ") end
-function SU.count(s, sub)
+function SU.join(t,sep) return table.concat(t, sep or ", ") end
+function SU.count(s,sub)
 	local n, i = 0, 1
 	while true do
-		local j = s:find(sub, i, true)
+		local j = s:find(sub,i,true)
 		if not j then break end
 		n = n + 1
 		i = j + #sub
 	end
 	return n
 end
-function SU.mask(s, ch)
-	ch = ch or "*"
-	return string.rep(ch, #s)
-end
-function SU.random(n)
+function SU.mask(s,ch) ch = ch or "*"; return string.rep(ch,#s) end
+function SU.randomStr(n)
 	local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	local o = {}
 	for _ = 1, n do
-		local i = math.random(1, #chars)
-		table.insert(o, chars:sub(i, i))
+		local i = math.random(1,#chars)
+		table.insert(o, chars:sub(i,i))
 	end
 	return table.concat(o)
 end
 ToolxUI.StringUtils = SU
 
--- =========================================================================
--- INSTANCE UTILITIES (15+)
--- =========================================================================
+-- ============= INSTANCE UTILS =============
 local IU = {}
-function IU.new(className, props, parent)
-	local obj = Instance.new(className)
+function IU.new(class, props, parent)
+	local o = Instance.new(class)
 	if props then
-		for k, v in pairs(props) do
-			if k ~= "Parent" then safe(function() obj[k] = v end) end
+		for k,v in pairs(props) do
+			if k ~= "Parent" then safe(function() o[k] = v end) end
 		end
 	end
-	obj.Parent = props and props.Parent or parent
-	return obj
+	o.Parent = props and props.Parent or parent
+	return o
 end
-function IU.find(parent, name) return parent and parent:FindFirstChild(name) end
-function IU.findOfClass(parent, className) return parent and parent:FindFirstChildOfClass(className) end
-function IU.waitFor(parent, name, timeout) return parent:WaitForChild(name, timeout) end
-function IU.destroy(obj) if obj then safe(function() obj:Destroy() end) end
-function IU.clear(parent)
-	if not parent then return end
-	for _, c in ipairs(parent:GetChildren()) do c:Destroy() end
+function IU.find(p,n) return p and p:FindFirstChild(n) end
+function IU.findOfClass(p,c) return p and p:FindFirstChildOfClass(c) end
+function IU.waitFor(p,n,t) return p:WaitForChild(n,t) end
+function IU.destroy(o) if o then safe(function() o:Destroy() end) end
+function IU.clear(p)
+	if not p then return end
+	for _,c in ipairs(p:GetChildren()) do c:Destroy() end
 end
-function IU.getAll(parent, className)
+function IU.getAll(p,class)
 	local o = {}
-	for _, c in ipairs(parent:GetChildren()) do
-		if not className or c:IsA(className) then table.insert(o, c) end
+	for _,c in ipairs(p:GetChildren()) do
+		if not class or c:IsA(class) then table.insert(o,c) end
 	end
 	return o
 end
-function IU.getAllDescendants(parent, className)
+function IU.getAllDescendants(p,class)
 	local o = {}
-	for _, c in ipairs(parent:GetDescendants()) do
-		if not className or c:IsA(className) then table.insert(o, c) end
+	for _,c in ipairs(p:GetDescendants()) do
+		if not class or c:IsA(class) then table.insert(o,c) end
 	end
 	return o
 end
-function IU.findFirstOfClass(parent, className) return parent:FindFirstChildOfClass(className) end
-function IU.forEach(parent, fn)
-	for _, c in ipairs(parent:GetChildren()) do fn(c) end
+function IU.forEach(p,fn)
+	for _,c in ipairs(p:GetChildren()) do fn(c) end
 end
-function IU.forEachDescendant(parent, fn)
-	for _, c in ipairs(parent:GetDescendants()) do fn(c) end
+function IU.forEachDescendant(p,fn)
+	for _,c in ipairs(p:GetDescendants()) do fn(c) end
 end
-function IU.clone(obj) return obj and obj:Clone() end
-function IU.isA(obj, class) return obj and obj:IsA(class) end
-function IU.setProps(obj, props)
-	for k, v in pairs(props) do safe(function() obj[k] = v end) end
+function IU.clone(o) return o and o:Clone() end
+function IU.isA(o,c) return o and o:IsA(c) end
+function IU.setProps(o,props)
+	for k,v in pairs(props) do safe(function() o[k] = v end) end
 end
-function IU.getRoot(obj)
-	if not obj then return nil end
-	if obj:IsA("Player") then return obj.Character end
-	if obj:IsA("Model") then return obj end
-	return obj:FindFirstAncestorOfClass("Model") or obj
+function IU.getRoot(o)
+	if not o then return nil end
+	if o:IsA("Player") then return o.Character end
+	if o:IsA("Model") then return o end
+	return o:FindFirstAncestorOfClass("Model") or o
 end
 ToolxUI.InstanceUtils = IU
 
--- =========================================================================
--- CHARACTER UTILITIES (30+)
--- =========================================================================
+-- ============= CHARACTER UTILS =============
 local CHU = {}
-function CHU.getCharacter(plr) return (plr or lp).Character end
-function CHU.getHumanoid(plr)
-	local c = CHU.getCharacter(plr)
+function CHU.getCharacter(p) return (p or lp).Character end
+function CHU.getHumanoid(p)
+	local c = CHU.getCharacter(p)
 	return c and c:FindFirstChildOfClass("Humanoid")
 end
-function CHU.getRoot(plr)
-	local c = CHU.getCharacter(plr)
+function CHU.getRoot(p)
+	local c = CHU.getCharacter(p)
 	return c and c:FindFirstChild("HumanoidRootPart")
 end
-function CHU.getHead(plr)
-	local c = CHU.getCharacter(plr)
+function CHU.getHead(p)
+	local c = CHU.getCharacter(p)
 	return c and c:FindFirstChild("Head")
 end
-function CHU.getTorso(plr)
-	local c = CHU.getCharacter(plr)
+function CHU.getTorso(p)
+	local c = CHU.getCharacter(p)
 	if not c then return nil end
 	return c:FindFirstChild("Torso") or c:FindFirstChild("UpperTorso") or c:FindFirstChild("LowerTorso")
 end
-function CHU.getLeftArm(plr)
-	local c = CHU.getCharacter(plr)
+function CHU.getLeftArm(p)
+	local c = CHU.getCharacter(p)
 	return c and (c:FindFirstChild("Left Arm") or c:FindFirstChild("LeftHand"))
 end
-function CHU.getRightArm(plr)
-	local c = CHU.getCharacter(plr)
+function CHU.getRightArm(p)
+	local c = CHU.getCharacter(p)
 	return c and (c:FindFirstChild("Right Arm") or c:FindFirstChild("RightHand"))
 end
-function CHU.getLeftLeg(plr)
-	local c = CHU.getCharacter(plr)
+function CHU.getLeftLeg(p)
+	local c = CHU.getCharacter(p)
 	return c and (c:FindFirstChild("Left Leg") or c:FindFirstChild("LeftFoot"))
 end
-function CHU.getRightLeg(plr)
-	local c = CHU.getCharacter(plr)
+function CHU.getRightLeg(p)
+	local c = CHU.getCharacter(p)
 	return c and (c:FindFirstChild("Right Leg") or c:FindFirstChild("RightFoot"))
 end
-function CHU.getPosition(plr)
-	local r = CHU.getRoot(plr)
+function CHU.getPosition(p)
+	local r = CHU.getRoot(p)
 	return r and r.Position
 end
-function CHU.getCFrame(plr)
-	local r = CHU.getRoot(plr)
+function CHU.getCFrame(p)
+	local r = CHU.getRoot(p)
 	return r and r.CFrame
 end
-function CHU.getHealth(plr)
-	local h = CHU.getHumanoid(plr)
+function CHU.getHealth(p)
+	local h = CHU.getHumanoid(p)
 	return h and h.Health or 0
 end
-function CHU.getMaxHealth(plr)
-	local h = CHU.getHumanoid(plr)
+function CHU.getMaxHealth(p)
+	local h = CHU.getHumanoid(p)
 	return h and h.MaxHealth or 0
 end
-function CHU.getHealthPercent(plr)
-	local h = CHU.getHumanoid(plr)
+function CHU.getHealthPercent(p)
+	local h = CHU.getHumanoid(p)
 	if h and h.MaxHealth > 0 then return h.Health / h.MaxHealth end
 	return 0
 end
-function CHU.isAlive(plr) return CHU.getHealth(plr) > 0 end
-function CHU.isDead(plr) return not CHU.isAlive(plr) end
-function CHU.getWalkSpeed(plr)
-	local h = CHU.getHumanoid(plr)
+function CHU.isAlive(p) return CHU.getHealth(p) > 0 end
+function CHU.isDead(p) return not CHU.isAlive(p) end
+function CHU.getWalkSpeed(p)
+	local h = CHU.getHumanoid(p)
 	return h and h.WalkSpeed or 0
 end
-function CHU.setWalkSpeed(plr, v)
-	local h = CHU.getHumanoid(plr)
+function CHU.setWalkSpeed(p,v)
+	local h = CHU.getHumanoid(p)
 	if h then h.WalkSpeed = v end
 end
-function CHU.getJumpPower(plr)
-	local h = CHU.getHumanoid(plr)
+function CHU.getJumpPower(p)
+	local h = CHU.getHumanoid(p)
 	return h and h.JumpPower or 0
 end
-function CHU.setJumpPower(plr, v)
-	local h = CHU.getHumanoid(plr)
+function CHU.setJumpPower(p,v)
+	local h = CHU.getHumanoid(p)
 	if h then h.JumpPower = v end
 end
-function CHU.jump(plr)
-	local h = CHU.getHumanoid(plr)
+function CHU.jump(p)
+	local h = CHU.getHumanoid(p)
 	if h then h.Jump = true end
 end
-function CHU.sit(plr)
-	local h = CHU.getHumanoid(plr)
+function CHU.sit(p)
+	local h = CHU.getHumanoid(p)
 	if h then h.Sit = true end
 end
-function CHU.stand(plr)
-	local h = CHU.getHumanoid(plr)
+function CHU.stand(p)
+	local h = CHU.getHumanoid(p)
 	if h then h.Sit = false end
 end
-function CHU.kill(plr)
-	local h = CHU.getHumanoid(plr)
+function CHU.kill(p)
+	local h = CHU.getHumanoid(p)
 	if h then h.Health = 0 end
 end
-function CHU.heal(plr)
-	local h = CHU.getHumanoid(plr)
+function CHU.heal(p)
+	local h = CHU.getHumanoid(p)
 	if h then h.Health = h.MaxHealth end
 end
-function CHU.setHealth(plr, v)
-	local h = CHU.getHumanoid(plr)
+function CHU.setHealth(p,v)
+	local h = CHU.getHumanoid(p)
 	if h then h.Health = v end
 end
-function CHU.teleport(plr, pos)
-	local r = CHU.getRoot(plr)
+function CHU.teleport(p,pos)
+	local r = CHU.getRoot(p)
 	if r then r.CFrame = CFrame.new(pos) end
 end
-function CHU.teleportTo(plr, target)
-	local r = CHU.getRoot(plr)
-	if r then r.CFrame = CFrame.new(target) end
-end
-function CHU.setCFrame(plr, cf)
-	local r = CHU.getRoot(plr)
+function CHU.setCFrame(p,cf)
+	local r = CHU.getRoot(p)
 	if r then r.CFrame = cf end
 end
-function CHU.getVelocity(plr)
-	local r = CHU.getRoot(plr)
+function CHU.getVelocity(p)
+	local r = CHU.getRoot(p)
 	return r and r.AssemblyLinearVelocity or Vector3.zero
 end
-function CHU.setVelocity(plr, v)
-	local r = CHU.getRoot(plr)
+function CHU.setVelocity(p,v)
+	local r = CHU.getRoot(p)
 	if r then r.AssemblyLinearVelocity = v end
 end
-function CHU.stop(plr)
-	local r = CHU.getRoot(plr)
+function CHU.stop(p)
+	local r = CHU.getRoot(p)
 	if r then
 		r.AssemblyLinearVelocity = Vector3.zero
 		r.AssemblyAngularVelocity = Vector3.zero
 	end
 end
-function CHU.getParts(plr)
-	local c = CHU.getCharacter(plr)
+function CHU.getParts(p)
+	local c = CHU.getCharacter(p)
 	local o = {}
 	if c then
-		for _, p in ipairs(c:GetChildren()) do
-			if p:IsA("BasePart") then table.insert(o, p) end
+		for _,pt in ipairs(c:GetChildren()) do
+			if pt:IsA("BasePart") then table.insert(o,pt) end
 		end
 	end
 	return o
 end
-function CHU.noclip(plr, enable)
-	for _, p in ipairs(CHU.getParts(plr)) do
-		p.CanCollide = not enable
+function CHU.noclip(p,v)
+	for _,pt in ipairs(CHU.getParts(p)) do
+		pt.CanCollide = not v
 	end
 end
-function CHU.anchor(plr, v)
-	local r = CHU.getRoot(plr)
+function CHU.anchor(p,v)
+	local r = CHU.getRoot(p)
 	if r then r.Anchored = v end
 end
-function CHU.freeze(plr, v)
-	local r = CHU.getRoot(plr)
+function CHU.freeze(p,v)
+	local r = CHU.getRoot(p)
 	if r then
 		r.Anchored = v
-		local h = CHU.getHumanoid(plr)
+		local h = CHU.getHumanoid(p)
 		if h then h.PlatformStand = v end
 	end
 end
 ToolxUI.CharacterUtils = CHU
 
--- =========================================================================
--- PLAYER UTILITIES (60+)
--- =========================================================================
+-- ============= PLAYER UTILS =============
 local PU = {}
 function PU.all(excludeLocal)
 	local o = {}
-	for _, p in ipairs(Players:GetPlayers()) do
-		if not excludeLocal or p ~= lp then table.insert(o, p) end
+	for _,p in ipairs(Players:GetPlayers()) do
+		if not excludeLocal or p ~= lp then table.insert(o,p) end
 	end
 	return o
 end
 function PU.byName(n)
-	for _, p in ipairs(Players:GetPlayers()) do if p.Name:lower() == n:lower() then return p end end
+	for _,p in ipairs(Players:GetPlayers()) do if p.Name:lower() == n:lower() then return p end end
 end
 function PU.byDisplayName(n)
-	for _, p in ipairs(Players:GetPlayers()) do if p.DisplayName:lower() == n:lower() then return p end end
+	for _,p in ipairs(Players:GetPlayers()) do if p.DisplayName:lower() == n:lower() then return p end end
 end
 function PU.byId(id)
-	for _, p in ipairs(Players:GetPlayers()) do if p.UserId == id then return p end end
+	for _,p in ipairs(Players:GetPlayers()) do if p.UserId == id then return p end end
 end
 function PU.byCharacter(char)
-	for _, p in ipairs(Players:GetPlayers()) do if p.Character == char then return p end end
+	for _,p in ipairs(Players:GetPlayers()) do if p.Character == char then return p end end
 end
 function PU.byPart(part)
 	if not part then return nil end
@@ -576,15 +520,15 @@ function PU.byPart(part)
 end
 function PU.alive(excludeLocal)
 	local o = {}
-	for _, p in ipairs(Players:GetPlayers()) do
-		if (not excludeLocal or p ~= lp) and isAlive(p) then table.insert(o, p) end
+	for _,p in ipairs(Players:GetPlayers()) do
+		if (not excludeLocal or p ~= lp) and isAlive(p) then table.insert(o,p) end
 	end
 	return o
 end
 function PU.dead(excludeLocal)
 	local o = {}
-	for _, p in ipairs(Players:GetPlayers()) do
-		if (not excludeLocal or p ~= lp) and not isAlive(p) then table.insert(o, p) end
+	for _,p in ipairs(Players:GetPlayers()) do
+		if (not excludeLocal or p ~= lp) and not isAlive(p) then table.insert(o,p) end
 	end
 	return o
 end
@@ -595,7 +539,7 @@ function PU.closest(origin, excludeLocal)
 	origin = origin or CHU.getPosition(lp)
 	if not origin then return nil, math.huge end
 	local near, minD = nil, math.huge
-	for _, p in ipairs(Players:GetPlayers()) do
+	for _,p in ipairs(Players:GetPlayers()) do
 		if not excludeLocal or p ~= lp then
 			local pp = CHU.getPosition(p)
 			if pp then
@@ -610,7 +554,7 @@ function PU.farthest(origin)
 	origin = origin or CHU.getPosition(lp)
 	if not origin then return nil, 0 end
 	local far, maxD = nil, 0
-	for _, p in ipairs(Players:GetPlayers()) do
+	for _,p in ipairs(Players:GetPlayers()) do
 		if p ~= lp then
 			local pp = CHU.getPosition(p)
 			if pp then
@@ -621,7 +565,7 @@ function PU.farthest(origin)
 	end
 	return far, maxD
 end
-function PU.distance(a, b)
+function PU.distance(a,b)
 	local pa, pb = CHU.getPosition(a), CHU.getPosition(b)
 	if pa and pb then return (pa-pb).Magnitude end
 	return math.huge
@@ -629,7 +573,7 @@ end
 function PU.sorted(origin, excludeLocal)
 	origin = origin or CHU.getPosition(lp)
 	local o = {}
-	for _, p in ipairs(Players:GetPlayers()) do
+	for _,p in ipairs(Players:GetPlayers()) do
 		if not excludeLocal or p ~= lp then
 			local pp = CHU.getPosition(p)
 			local d = (pp and origin) and (pp-origin).Magnitude or math.huge
@@ -642,22 +586,23 @@ end
 function PU.inRadius(origin, radius)
 	local o = {}
 	if not origin then return o end
-	for _, p in ipairs(Players:GetPlayers()) do
+	for _,p in ipairs(Players:GetPlayers()) do
 		if p ~= lp then
 			local pp = CHU.getPosition(p)
-			if pp and (pp-origin).Magnitude <= radius then table.insert(o, p) end
+			if pp and (pp-origin).Magnitude <= radius then table.insert(o,p) end
 		end
 	end
 	return o
 end
 function PU.randomPlayer(excludeLocal)
 	local l = PU.all(excludeLocal)
-	return l[math.random(1, #l)]
+	if #l == 0 then return nil end
+	return l[math.random(1,#l)]
 end
 function PU.hasTool(p, name)
 	local c = p and p.Character
 	if not c then return false end
-	for _, t in ipairs(c:GetChildren()) do
+	for _,t in ipairs(c:GetChildren()) do
 		if t:IsA("Tool") and (not name or t.Name == name) then return true end
 	end
 	return false
@@ -666,8 +611,8 @@ function PU.getTools(p)
 	local o = {}
 	local c = p and p.Character
 	if c then
-		for _, t in ipairs(c:GetChildren()) do
-			if t:IsA("Tool") then table.insert(o, t) end
+		for _,t in ipairs(c:GetChildren()) do
+			if t:IsA("Tool") then table.insert(o,t) end
 		end
 	end
 	return o
@@ -676,20 +621,20 @@ function PU.getBackpackTools(p)
 	local o = {}
 	local b = p and p.Backpack
 	if b then
-		for _, t in ipairs(b:GetChildren()) do
-			if t:IsA("Tool") then table.insert(o, t) end
+		for _,t in ipairs(b:GetChildren()) do
+			if t:IsA("Tool") then table.insert(o,t) end
 		end
 	end
 	return o
 end
 function PU.getAllTools(p)
 	local o = {}
-	for _, t in ipairs(PU.getTools(p)) do table.insert(o, t) end
-	for _, t in ipairs(PU.getBackpackTools(p)) do table.insert(o, t) end
+	for _,t in ipairs(PU.getTools(p)) do table.insert(o,t) end
+	for _,t in ipairs(PU.getBackpackTools(p)) do table.insert(o,t) end
 	return o
 end
 function PU.findTool(p, name)
-	for _, t in ipairs(PU.getAllTools(p)) do
+	for _,t in ipairs(PU.getAllTools(p)) do
 		if t.Name == name then return t end
 	end
 end
@@ -711,11 +656,11 @@ function PU.team(p) return p and p.Team end
 function PU.teamColor(p) return p and p.TeamColor end
 function PU.byTeam(team)
 	local o = {}
-	for _, p in ipairs(Players:GetPlayers()) do if p.Team == team then table.insert(o, p) end end
+	for _,p in ipairs(Players:GetPlayers()) do if p.Team == team then table.insert(o,p) end end
 	return o
 end
-function PU.rank(p, groupId) return p and p:GetRankInGroup(groupId) or 0 end
-function PU.role(p, groupId) return p and p:GetRoleInGroup(groupId) or "" end
+function PU.rank(p, gid) return p and p:GetRankInGroup(gid) or 0 end
+function PU.role(p, gid) return p and p:GetRoleInGroup(gid) or "" end
 function PU.displayName(p) return p and p.DisplayName or "" end
 function PU.userId(p) return p and p.UserId or 0 end
 function PU.isTyping(p)
@@ -726,70 +671,44 @@ function PU.hasCharacter(p) return p and p.Character ~= nil end
 function PU.getCharacter(p) return p and p.Character end
 function PU.getHumanoid(p) return CHU.getHumanoid(p) end
 function PU.getRoot(p) return CHU.getRoot(p) end
-function PU.getHRP(p) return CHU.getRoot(p) end
 function PU.getPosition(p) return CHU.getPosition(p) end
 function PU.getHealth(p) return CHU.getHealth(p) end
 function PU.getMaxHealth(p) return CHU.getMaxHealth(p) end
 function PU.getWalkSpeed(p) return CHU.getWalkSpeed(p) end
-function PU.setWalkSpeed(p, v) CHU.setWalkSpeed(p, v) end
-function PU.setJumpPower(p, v) CHU.setJumpPower(p, v) end
+function PU.setWalkSpeed(p,v) CHU.setWalkSpeed(p,v) end
+function PU.setJumpPower(p,v) CHU.setJumpPower(p,v) end
 function PU.kill(p) CHU.kill(p) end
-function PU.teleport(p, pos) CHU.teleport(p, pos) end
-function PU.teleportToPlayer(a, b)
-	local rb = CHU.getRoot(b)
-	if rb then CHU.teleport(a, rb.Position + Vector3.new(0, 3, 0)) end
-end
-function PU.noclip(p, v) CHU.noclip(p, v) end
-function PU.freeze(p, v) CHU.freeze(p, v) end
-function PU.sameTeam(a, b) return a.Team == b.Team end
+function PU.teleport(p,pos) CHU.teleport(p,pos) end
+function PU.noclip(p,v) CHU.noclip(p,v) end
+function PU.freeze(p,v) CHU.freeze(p,v) end
+function PU.sameTeam(a,b) return a.Team == b.Team end
 function PU.isBot(p) return p and p.UserId < 0 end
 function PU.friends()
 	local o = {}
-	for _, p in ipairs(Players:GetPlayers()) do
-		if PU.isFriend(p) then table.insert(o, p) end
+	for _,p in ipairs(Players:GetPlayers()) do
+		if PU.isFriend(p) then table.insert(o,p) end
 	end
 	return o
 end
 function PU.nonFriends(excludeLocal)
 	local o = {}
-	for _, p in ipairs(Players:GetPlayers()) do
-		if (not excludeLocal or p ~= lp) and not PU.isFriend(p) then table.insert(o, p) end
+	for _,p in ipairs(Players:GetPlayers()) do
+		if (not excludeLocal or p ~= lp) and not PU.isFriend(p) then table.insert(o,p) end
 	end
 	return o
 end
 function PU.closestAlive(origin)
 	local l = PU.sorted(origin, true)
-	for _, e in ipairs(l) do
+	for _,e in ipairs(l) do
 		if isAlive(e.player) then return e.player, e.dist end
 	end
 end
 function PU.closestDead(origin)
 	local l = PU.sorted(origin, true)
-	for _, e in ipairs(l) do
+	for _,e in ipairs(l) do
 		if not isAlive(e.player) then return e.player, e.dist end
 	end
 end
-function PU.watch(p, field, fn)
-	if field == "Character" then return p.CharacterAdded:Connect(fn) end
-	if field == "Health" then
-		local h = CHU.getHumanoid(p)
-		if h then return h:GetPropertyChangedSignal("Health"):Connect(fn) end
-	end
-	if field == "Position" then
-		local r = CHU.getRoot(p)
-		if r then return r:GetPropertyChangedSignal("Position"):Connect(fn) end
-	end
-end
-function PU.watchAll(fn)
-	local conns = {}
-	for _, p in ipairs(Players:GetPlayers()) do
-		local c = PU.watch(p, "Character", function() fn(p) end)
-		if c then table.insert(conns, c) end
-	end
-	return conns
-end
-function PU.onPlayerAdded(fn) return Players.PlayerAdded:Connect(fn) end
-function PU.onPlayerRemoved(fn) return Players.PlayerRemoving:Connect(fn) end
 function PU.getLocalPlayer() return lp end
 function PU.getName(p) return p and p.Name or "" end
 function PU.getUserIdFromName(name)
@@ -802,9 +721,7 @@ function PU.getNameFromUserId(id)
 end
 ToolxUI.PlayerUtils = PU
 
--- =========================================================================
--- CAMERA UTILITIES (15+)
--- =========================================================================
+-- ============= CAMERA UTILS =============
 local CAM = {}
 function CAM.get() return Workspace.CurrentCamera end
 function CAM.getCFrame() local c = CAM.get(); return c and c.CFrame end
@@ -838,15 +755,9 @@ end
 function CAM.getFOV()
 	local c = CAM.get(); return c and c.FieldOfView or 70
 end
-function CAM.setDistance(d)
-	local c = CAM.get()
-	if c then c.CFrame = CFrame.new(c.CFrame.Position - c.CFrame.LookVector * d) * (c.CFrame - c.CFrame.Position) end
-end
 ToolxUI.CameraUtils = CAM
 
--- =========================================================================
--- SOUND UTILITIES (10+)
--- =========================================================================
+-- ============= SOUND UTILS =============
 local SB = {}
 function SB.play(id, vol, pitch)
 	local s = Instance.new("Sound")
@@ -855,7 +766,7 @@ function SB.play(id, vol, pitch)
 	s.PlaybackSpeed = pitch or 1
 	s.Parent = SoundService
 	s:Play()
-	Debris:AddItem(s, 5)
+	task.delay(5, function() safe(function() s:Destroy() end) end)
 	return s
 end
 function SB.stop(s) if s then safe(function() s:Stop() end) end end
@@ -864,7 +775,7 @@ function SB.resume(s) if s then safe(function() s:Resume() end) end end
 function SB.setVolume(s, v) if s then s.Volume = v end end
 function SB.setPitch(s, p) if s then s.PlaybackSpeed = p end end
 function SB.stopAll()
-	for _, s in ipairs(SoundService:GetChildren()) do
+	for _,s in ipairs(SoundService:GetChildren()) do
 		if s:IsA("Sound") then safe(function() s:Stop() s:Destroy() end) end
 	end
 end
@@ -873,9 +784,7 @@ function SB.getTime(s) return s and s.TimePosition or 0 end
 function SB.getLength(s) return s and s.TimeLength or 0 end
 ToolxUI.SoundUtils = SB
 
--- =========================================================================
--- NOTIFICATION / TIME / FILE UTILS (15+)
--- =========================================================================
+-- ============= TIME UTILS =============
 local NU = {}
 function NU.now() return tick() end
 function NU.os() return os.time() end
@@ -893,6 +802,7 @@ function NU.spawn(fn, ...) task.spawn(fn, ...) end
 function NU.defer(fn, ...) task.defer(fn, ...) end
 ToolxUI.TimeUtils = NU
 
+-- ============= FILE UTILS =============
 local FU = {}
 function FU.exists(p) return isfile(p) end
 function FU.folderExists(p) return isfolder(p) end
@@ -926,16 +836,13 @@ function FU.list(p)
 end
 ToolxUI.FileUtils = FU
 
--- =========================================================================
--- RAYCAST UTILITIES (5+)
--- =========================================================================
+-- ============= RAY UTILS =============
 local RU = {}
 function RU.cast(origin, dir, ignore)
 	local p = RaycastParams.new()
 	p.FilterType = Enum.RaycastFilterType.Exclude
 	p.FilterDescendantsInstances = ignore or {lp.Character}
-	local r = Workspace:Raycast(origin, dir, p)
-	return r
+	return Workspace:Raycast(origin, dir, p)
 end
 function RU.castBetween(a, b, ignore)
 	return RU.cast(a, b - a, ignore)
@@ -953,25 +860,17 @@ function RU.isVisible(target, ignore)
 	if not p then return true end
 	return (p.Position - target).Magnitude < 1
 end
-function RU.raycastAll(origin, dir, ignore)
-	local p = RaycastParams.new()
-	p.FilterType = Enum.RaycastFilterType.Exclude
-	p.FilterDescendantsInstances = ignore or {lp.Character}
-	return Workspace:Raycast(origin, dir, p)
-end
 ToolxUI.RayUtils = RU
 
--- =========================================================================
--- FONTS / ICONS / THEMES
--- =========================================================================
-local function tf(n, w) local f; safe(function() f = Font.fromName(n, w or Enum.FontWeight.Regular) end); return f end
+-- ============= FONTS / ICONS / THEMES =============
+local function tf(n,w) local f; safe(function() f = Font.fromName(n, w or Enum.FontWeight.Regular) end); return f end
 local FONTS = {
 	Title = tf("Zekton", Enum.FontWeight.Bold) or Enum.Font.GothamBlack,
 	Bold = tf("Zekton", Enum.FontWeight.SemiBold) or Enum.Font.GothamBold,
 	Body = tf("Oswald", Enum.FontWeight.Medium) or Enum.Font.GothamSemibold,
 	Reg = tf("Roboto", Enum.FontWeight.Regular) or Enum.Font.Gotham,
 }
-local function setFont(o, f)
+local function setFont(o,f)
 	if not o or not f then return end
 	if typeof(f) == "EnumItem" then safe(function() o.Font = f end)
 	else safe(function() o.FontFace = f end) end
@@ -982,7 +881,6 @@ local ICONS = {
 	Min = "rbxassetid://6031090990",
 	Max = "rbxassetid://6031094667",
 	Back = "rbxassetid://6031091004",
-	Close = "rbxassetid://6031094678",
 }
 local CLICK = "rbxassetid://6895079853"
 local HOVER = "rbxassetid://6895079853"
@@ -1004,22 +902,27 @@ ToolxUI.Fonts = FONTS
 ToolxUI.Icons = ICONS
 ToolxUI.Themes = THEMES
 
--- =========================================================================
--- EFFECTS ENGINE
--- =========================================================================
+-- ============= EFFECTS ENGINE =============
 local shineList, spinList = {}, {}
-local function addShine(g, spd) if not g then return end; table.insert(shineList, {grad=g, speed=spd or 0.015, dir=1}); safe(function() g.Offset = Vector2.new(-1,0) end) end
-local function addSpin(o, spd) if not o then return end; table.insert(spinList, {obj=o, speed=spd or 1}) end
+local function addShine(g, spd)
+	if not g then return end
+	table.insert(shineList, {grad=g, speed=spd or 0.015, dir=1})
+	safe(function() g.Offset = Vector2.new(-1,0) end)
+end
+local function addSpin(o, spd)
+	if not o then return end
+	table.insert(spinList, {obj=o, speed=spd or 1})
+end
 RunService.RenderStepped:Connect(function(dt)
 	local step = dt * 60
-	for _, s in ipairs(shineList) do
+	for _,s in ipairs(shineList) do
 		if s.grad and s.grad.Parent then
 			local nx = s.grad.Offset.X + s.speed * step * s.dir
 			if nx > 1 then s.dir = -1; nx = 1 elseif nx < -1 then s.dir = 1; nx = -1 end
 			s.grad.Offset = Vector2.new(nx, 0)
 		end
 	end
-	for _, s in ipairs(spinList) do
+	for _,s in ipairs(spinList) do
 		if s.obj and s.obj.Parent then
 			s.obj.Rotation = (s.obj.Rotation + s.speed * step) % 360
 		end
@@ -1132,9 +1035,7 @@ local function defaultNotify(text, color, dur)
 end
 ToolxUI.Notify = function(text, color, dur) defaultNotify(text, color, dur) end
 
--- =========================================================================
--- WINDOW CLASS
--- =========================================================================
+-- ============= WINDOW CLASS =============
 function ToolxUI:CreateWindow(opt)
 	opt = opt or {}
 	local W = {}
@@ -1342,7 +1243,8 @@ function ToolxUI:CreateWindow(opt)
 	function W:BurstAt(x, y, cA, cB, count, dist)
 		if not self.Config.Effects.Particles then return end
 		count = count or 8; dist = dist or 25
-		cA = cA or self.Config.Accent; cB = cB or CU.darken(self.Config.Accent, 120)
+		cA = cA or self.Config.Accent
+		cB = cB or CU.darken(self.Config.Accent, 120)
 		for _ = 1, count do
 			task.spawn(function()
 				local p = Instance.new("Frame", FxGui)
@@ -1514,7 +1416,7 @@ function ToolxUI:CreateWindow(opt)
 			tip.BackgroundColor3 = Color3.fromRGB(15,5,5)
 			tip.BorderSizePixel = 0
 			tip.Position = UDim2.new(0, obj.AbsolutePosition.X, 0, obj.AbsolutePosition.Y - 28)
-			tip.Size = UDim2.new(0, 0, 0, 22)
+			tip.Size = UDim2.new(0, 100, 0, 22)
 			tip.BackgroundTransparency = 1
 			tip.ZIndex = 100
 			Instance.new("UICorner", tip).CornerRadius = UDim.new(0, 4)
@@ -1535,12 +1437,14 @@ function ToolxUI:CreateWindow(opt)
 			TweenService:Create(tip, E.SIO, {BackgroundTransparency = 0}):Play()
 			TweenService:Create(st, E.SIO, {Transparency = 0}):Play()
 			TweenService:Create(lbl, E.SIO, {TextTransparency = 0}):Play()
-			obj.MouseLeave:Once(function()
-				TweenService:Create(tip, E.SIO, {BackgroundTransparency = 1}):Play()
-				TweenService:Create(st, E.SIO, {Transparency = 1}):Play()
-				TweenService:Create(lbl, E.SIO, {TextTransparency = 1}):Play()
-				task.wait(0.25)
-				tip:Destroy()
+			task.delay(2, function()
+				if tip and tip.Parent then
+					TweenService:Create(tip, E.SIO, {BackgroundTransparency = 1}):Play()
+					TweenService:Create(st, E.SIO, {Transparency = 1}):Play()
+					TweenService:Create(lbl, E.SIO, {TextTransparency = 1}):Play()
+					task.wait(0.25)
+					tip:Destroy()
+				end
 			end)
 		end)
 	end
@@ -1769,9 +1673,7 @@ function ToolxUI:CreateWindow(opt)
 	return W
 end
 
--- =========================================================================
--- TAB COMPONENT BUILDERS (attached via wrapper)
--- =========================================================================
+-- ============= TAB COMPONENTS =============
 local Tab = {}
 
 function Tab:_styledButton(text, color, height)
@@ -2132,8 +2034,7 @@ function Tab:CreateParagraph(cfg)
 	cfg = cfg or {}
 	local W = self.Window
 	local holder = Instance.new("Frame")
-	holder.Size = UDim2.new(1, 0, 0, 20)
-	holder.AutomaticSize = Enum.AutomaticSize.Y
+	holder.Size = UDim2.new(1, 0, 0, 40)
 	holder.BackgroundTransparency = 1
 	holder.LayoutOrder = self:GetNextOrder()
 	holder.Parent = self.Content
@@ -2148,14 +2049,13 @@ function Tab:CreateParagraph(cfg)
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.ZIndex = 6
 	local body = Instance.new("TextLabel", holder)
-	body.Size = UDim2.new(1, 0, 0, 14)
+	body.Size = UDim2.new(1, 0, 0, 20)
 	body.Position = UDim2.new(0, 0, 0, 18)
 	body.BackgroundTransparency = 1
 	body.Text = cfg.Body or ""
 	body.TextColor3 = W.Theme.Sub
 	body.TextSize = 11
 	body.TextWrapped = true
-	body.AutomaticSize = Enum.AutomaticSize.Y
 	body.TextXAlignment = Enum.TextXAlignment.Left
 	setFont(body, FONTS.Reg)
 	body.ZIndex = 6
@@ -2364,8 +2264,18 @@ function Tab:CreateColorPicker(cfg)
 	setFont(rBox, FONTS.Reg)
 	rBox.ZIndex = 6
 	Instance.new("UICorner", rBox).CornerRadius = UDim.new(0, 4)
-	local gBox = rBox:Clone(); gBox.Position = UDim2.new(0.32, 0, 0, 50); gBox.PlaceholderText = "G"; gBox.PlaceholderColor3 = Color3.fromRGB(80,200,80); gBox.TextColor3 = Color3.fromRGB(150,255,150); gBox.Parent = holder
-	local bBox = rBox:Clone(); bBox.Position = UDim2.new(0.64, 0, 0, 50); bBox.PlaceholderText = "B"; bBox.PlaceholderColor3 = Color3.fromRGB(80,80,200); bBox.TextColor3 = Color3.fromRGB(150,150,255); bBox.Parent = holder
+	local gBox = rBox:Clone()
+	gBox.Position = UDim2.new(0.32, 0, 0, 50)
+	gBox.PlaceholderText = "G"
+	gBox.PlaceholderColor3 = Color3.fromRGB(80,200,80)
+	gBox.TextColor3 = Color3.fromRGB(150,255,150)
+	gBox.Parent = holder
+	local bBox = rBox:Clone()
+	bBox.Position = UDim2.new(0.64, 0, 0, 50)
+	bBox.PlaceholderText = "B"
+	bBox.PlaceholderColor3 = Color3.fromRGB(80,80,200)
+	bBox.TextColor3 = Color3.fromRGB(150,150,255)
+	bBox.Parent = holder
 	local apply = Instance.new("TextButton", holder)
 	apply.Size = UDim2.new(0.32, 0, 0, 24)
 	apply.Position = UDim2.new(0.68, 0, 0, 50)
@@ -2445,10 +2355,14 @@ function Tab:CreatePlayerList(cfg)
 	local l = Instance.new("UIListLayout", scrolling)
 	l.Padding = UDim.new(0, 3)
 	local p = Instance.new("UIPadding", scrolling)
-	p.PaddingLeft = UDim.new(0, 3); p.PaddingRight = UDim.new(0, 3); p.PaddingTop = UDim.new(0, 3)
+	p.PaddingLeft = UDim.new(0, 3)
+	p.PaddingRight = UDim.new(0, 3)
+	p.PaddingTop = UDim.new(0, 3)
 	local selected = nil
 	local function update()
-		for _, c in ipairs(scrolling:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+		for _, c in ipairs(scrolling:GetChildren()) do
+			if c:IsA("TextButton") then c:Destroy() end
+		end
 		for _, pl in ipairs(Players:GetPlayers()) do
 			if pl ~= lp then
 				local b = Instance.new("TextButton", scrolling)
@@ -2592,54 +2506,39 @@ function Tab:CreateRichText(cfg)
 	setFont(lbl, FONTS.Reg)
 	lbl.TextXAlignment = Enum.TextXAlignment.Left
 	lbl.TextWrapped = true
-	lbl.AutomaticSize = Enum.AutomaticSize.Y
 	lbl.ZIndex = 6
 	lbl.LayoutOrder = self:GetNextOrder()
 	lbl.Parent = self.Content
 	return lbl
 end
 
-function Tab:CreateLineChart(cfg)
-	local holder = Instance.new("Frame")
-	holder.Size = UDim2.new(1, 0, 0, cfg and cfg.Height or 60)
-	holder.BackgroundColor3 = Color3.fromRGB(18,8,8)
-	holder.BorderSizePixel = 0
-	holder.LayoutOrder = self:GetNextOrder()
-	holder.Parent = self.Content
-	holder.ZIndex = 6
-	Instance.new("UICorner", holder).CornerRadius = UDim.new(0, 4)
-	return holder
-end
-
-function Tab:CreateSeperator() return self:CreateDivider() end
 function Tab:CreateSmallButton(text, cb)
 	return self:CreateButton({Text = text, Height = 22, Callback = cb})
 end
 function Tab:CreateBigButton(text, cb)
 	return self:CreateButton({Text = text, Height = 36, Callback = cb})
 end
+function Tab:CreateSeperator() return self:CreateDivider() end
 
--- Attach tab functions to created tabs
+-- Attach to created tabs
 local function attachTab(t)
 	for k, v in pairs(Tab) do t[k] = v end
 	return t
 end
 
-local _oldCreateWindow = ToolxUI.CreateWindow
+local _origCreateWindow = ToolxUI.CreateWindow
 function ToolxUI:CreateWindow(opt)
-	local W = _oldCreateWindow(self, opt)
-	local _oldCT = W.CreateTab
+	local W = _origCreateWindow(self, opt)
+	local _origCT = W.CreateTab
 	W.CreateTab = function(w, name)
-		local tab = _oldCT(w, name)
+		local tab = _origCT(w, name)
 		attachTab(tab)
 		return tab
 	end
 	return W
 end
 
--- =========================================================================
--- KEY SYSTEM
--- =========================================================================
+-- ============= KEY SYSTEM =============
 function ToolxUI:BuildKeySystem(win, key, hint)
 	local W = win
 	local g = Instance.new("ScreenGui")
@@ -2763,9 +2662,7 @@ function ToolxUI:BuildKeySystem(win, key, hint)
 	return g
 end
 
--- =========================================================================
--- SETTINGS PANEL
--- =========================================================================
+-- ============= SETTINGS PANEL =============
 function ToolxUI:BuildSettingsPanel(W)
 	local panel = Instance.new("Frame", W.Gui)
 	panel.Size = UDim2.new(0, 260, 0, 340)
@@ -2899,9 +2796,7 @@ function ToolxUI:BuildSettingsPanel(W)
 	W.SettingsPanel = panel
 end
 
--- =========================================================================
--- EXTRA API
--- =========================================================================
+-- ============= EXTRA API =============
 function ToolxUI:GetVersion() return self._version end
 function ToolxUI:GetThemes() return TU.keys(THEMES) end
 function ToolxUI:GetTheme(name) return THEMES[name] end
