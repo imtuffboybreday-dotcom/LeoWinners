@@ -1,13 +1,16 @@
---  why i create this bc i larp
---	ToolxUI Library v2.0
---	By LeoV1 And Rex
---	120+ Working Functions
+--[[
+	ToolxUI Library v3.0 "Omni"
+	By LeoV1 And Rex
+	350+ Working Functions — Better than every UI Library out there
+]]
 
 local ToolxUI = {}
 ToolxUI.__index = ToolxUI
-ToolxUI._version = "2.0"
+ToolxUI._version = "3.0"
 
--- ============= SERVICES =============
+-- =========================================================================
+-- SERVICES
+-- =========================================================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -15,8 +18,20 @@ local UIS = game:GetService("UserInputService")
 local SoundService = game:GetService("SoundService")
 local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+local TeleportService = game:GetService("TeleportService")
+local StarterGui = game:GetService("StarterGui")
+local ContextActionService = game:GetService("ContextActionService")
+local GuiService = game:GetService("GuiService")
+local CollectionService = game:GetService("CollectionService")
+local TextService = game:GetService("TextService")
+local Debris = game:GetService("Debris")
 local lp = Players.LocalPlayer
 
+-- =========================================================================
+-- SAFE UTILITIES
+-- =========================================================================
 local function safe(fn, ...)
 	local ok, res = pcall(fn, ...)
 	if not ok then warn("[ToolxUI]", res) end
@@ -27,12 +42,928 @@ local function getParent()
 	safe(function() h = gethui() end)
 	return h or CoreGui
 end
-local function brighten(c, a) return Color3.fromRGB(math.min(c.R*255+a,255), math.min(c.G*255+a,255), math.min(c.B*255+a,255)) end
-local function darken(c, s) return Color3.fromRGB(math.max(c.R*255-s,0), math.max(c.G*255-s,0), math.max(c.B*255-s,0)) end
-local function clamp(v, a, b) return math.max(a, math.min(b, v)) end
-local function round(n) return math.floor(n + 0.5) end
+local function isAlive(plr)
+	plr = plr or lp
+	return plr and plr.Character and plr.Character:FindFirstChildOfClass("Humanoid") and plr.Character:FindFirstChildOfClass("Humanoid").Health > 0
+end
 
--- ============= FONTS =============
+-- =========================================================================
+-- COLOR UTILITIES (25+)
+-- =========================================================================
+local CU = {}
+function CU.brighten(c, a) return Color3.fromRGB(math.min(c.R*255+a,255), math.min(c.G*255+a,255), math.min(c.B*255+a,255)) end
+function CU.darken(c, s) return Color3.fromRGB(math.max(c.R*255-s,0), math.max(c.G*255-s,0), math.max(c.B*255-s,0)) end
+function CU.lerp(a, b, t) return Color3.new(a.R+(b.R-a.R)*t, a.G+(b.G-a.G)*t, a.B+(b.B-a.B)*t) end
+function CU.fromRGB(r,g,b) return Color3.fromRGB(r,g,b) end
+function CU.fromHex(hex)
+	hex = hex:gsub("#","")
+	local r = tonumber(hex:sub(1,2), 16) or 0
+	local g = tonumber(hex:sub(3,4), 16) or 0
+	local b = tonumber(hex:sub(5,6), 16) or 0
+	return Color3.fromRGB(r,g,b)
+end
+function CU.toHex(c) return string.format("#%02X%02X%02X", math.floor(c.R*255), math.floor(c.G*255), math.floor(c.B*255)) end
+function CU.fromHSV(h,s,v) return Color3.fromHSV(h,s,v) end
+function CU.toHSV(c) return c:ToHSV() end
+function CU.random() return Color3.fromRGB(math.random(0,255), math.random(0,255), math.random(0,255)) end
+function CU.gradient(color1, color2, steps)
+	local t = {}
+	for i = 1, steps do t[i] = CU.lerp(color1, color2, (i-1)/(steps-1)) end
+	return t
+end
+function CU.complementary(c)
+	local h,s,v = c:ToHSV()
+	return Color3.fromHSV((h+0.5)%1, s, v)
+end
+function CU.invert(c) return Color3.new(1-c.R, 1-c.G, 1-c.B) end
+function CU.grayscale(c)
+	local avg = (c.R + c.G + c.B) / 3
+	return Color3.new(avg, avg, avg)
+end
+function CU.isDark(c) return (c.R*0.299 + c.G*0.587 + c.B*0.114) < 0.5 end
+function CU.isLight(c) return not CU.isDark(c) end
+function CU.contrastText(bg) return CU.isDark(bg) and Color3.new(1,1,1) or Color3.new(0,0,0) end
+function CU.warm(c) return Color3.new(math.min(c.R*1.2,1), c.G, math.max(c.B*0.8,0)) end
+function CU.cool(c) return Color3.new(math.max(c.R*0.8,0), c.G, math.min(c.B*1.2,1)) end
+function CU.saturate(c, amount)
+	local h,s,v = c:ToHSV()
+	return Color3.fromHSV(h, math.clamp(s+amount,0,1), v)
+end
+function CU.desaturate(c, amount) return CU.saturate(c, -amount) end
+function CU.blend(a, b, alpha) return CU.lerp(a, b, alpha) end
+function CU.tint(c, t) return CU.lerp(c, t, 0.5) end
+function CU.shift(c) return Color3.new(c.B, c.R, c.G) end
+function CU.equals(a, b, tol)
+	tol = tol or 0.01
+	return math.abs(a.R-b.R)<tol and math.abs(a.G-b.G)<tol and math.abs(a.B-b.B)<tol
+end
+ToolxUI.ColorUtils = CU
+
+-- =========================================================================
+-- MATH / VECTOR UTILITIES (30+)
+-- =========================================================================
+local MU = {}
+function MU.clamp(v,a,b) return math.max(a, math.min(b, v)) end
+function MU.round(n) return math.floor(n+0.5) end
+function MU.roundTo(n, dp)
+	local m = 10^dp
+	return math.floor(n*m+0.5)/m
+end
+function MU.lerp(a,b,t) return a + (b-a)*t end
+function MU.inverseLerp(a,b,v) if a==b then return 0 end; return (v-a)/(b-a) end
+function MU.map(v, inMin, inMax, outMin, outMax) return outMin + (v-inMin)*(outMax-outMin)/(inMax-inMin) end
+function MU.sign(n) return n > 0 and 1 or (n < 0 and -1 or 0) end
+function MU.distance(a,b) return (a-b).Magnitude end
+function MU.distance2D(a,b) return (Vector2.new(a.X,a.Z)-Vector2.new(b.X,b.Z)).Magnitude end
+function MU.angleBetween(a,b) return math.acos(math.clamp(a.Unit:Dot(b.Unit),-1,1)) end
+function MU.randomFloat(a,b) return a + math.random()*(b-a) end
+function MU.randomInt(a,b) return math.random(a,b) end
+function MU.randomVector(a,b)
+	return Vector3.new(MU.randomFloat(a.X,b.X), MU.randomFloat(a.Y,b.Y), MU.randomFloat(a.Z,b.Z))
+end
+function MU.smooth(current, target, speed, dt)
+	return current + (target-current) * math.clamp(speed*dt*60, 0, 1)
+end
+function MU.moveTowards(a, b, maxDelta)
+	local d = b - a
+	if d.Magnitude <= maxDelta then return b end
+	return a + d.Unit * maxDelta
+end
+function MU.wrap(n, min, max)
+	local r = max - min
+	return min + ((n - min) % r + r) % r
+end
+function MU.isPowerOfTwo(n) return n > 0 and (n & (n-1)) == 0 end
+function MU.gcd(a, b) while b ~= 0 do a, b = b, a % b end; return a end
+function MU.lcm(a, b) return a * b / MU.gcd(a, b) end
+function MU.factorial(n) local r = 1; for i = 2, n do r = r * i end; return r end
+function MU.fibonacci(n)
+	if n < 2 then return n end
+	local a, b = 0, 1
+	for _ = 2, n do a, b = b, a + b end
+	return b
+end
+function MU.isPrime(n)
+	if n < 2 then return false end
+	for i = 2, math.sqrt(n) do if n % i == 0 then return false end end
+	return true
+end
+function MU.degrees(r) return math.deg(r) end
+function MU.radians(d) return math.rad(d) end
+function MU.sin(d) return math.sin(d) end
+function MU.cos(d) return math.cos(d) end
+function MU.tan(d) return math.tan(d) end
+function MU.atan2(y,x) return math.atan2(y,x) end
+function MU.sqrt(n) return math.sqrt(n) end
+function MU.pow(a,b) return a^b end
+function MU.log(n, base) return math.log(n, base) end
+function MU.exp(n) return math.exp(n) end
+function MU.abs(n) return math.abs(n) end
+function MU.floor(n) return math.floor(n) end
+function MU.ceil(n) return math.ceil(n) end
+function MU.max(...) return math.max(...) end
+function MU.min(...) return math.min(...) end
+function MU.sum(t)
+	local s = 0
+	for _, v in ipairs(t) do s = s + v end
+	return s
+end
+function MU.avg(t) return MU.sum(t) / #t end
+function MU.median(t)
+	local c = {}
+	for i, v in ipairs(t) do c[i] = v end
+	table.sort(c)
+	local n = #c
+	if n % 2 == 0 then return (c[n/2] + c[n/2+1]) / 2 end
+	return c[math.ceil(n/2)]
+end
+ToolxUI.MathUtils = MU
+
+-- =========================================================================
+-- TABLE UTILITIES (20+)
+-- =========================================================================
+local TU = {}
+function TU.copy(t)
+	local n = {}
+	for k,v in pairs(t) do n[k] = v end
+	return n
+end
+function TU.deepCopy(t)
+	local n = {}
+	for k,v in pairs(t) do
+		if type(v) == "table" then n[k] = TU.deepCopy(v)
+		else n[k] = v end
+	end
+	return n
+end
+function TU.merge(a, b)
+	local n = TU.copy(a)
+	for k,v in pairs(b) do n[k] = v end
+	return n
+end
+function TU.keys(t)
+	local o = {}
+	for k in pairs(t) do table.insert(o, k) end
+	return o
+end
+function TU.values(t)
+	local o = {}
+	for _, v in pairs(t) do table.insert(o, v) end
+	return o
+end
+function TU.size(t)
+	local n = 0
+	for _ in pairs(t) do n = n + 1 end
+	return n
+end
+function TU.contains(t, v)
+	for _, x in ipairs(t) do if x == v then return true end end
+	return false
+end
+function TU.containsKey(t, k) return t[k] ~= nil end
+function TU.find(t, fn)
+	for i, v in ipairs(t) do if fn(v, i) then return i, v end end
+end
+function TU.filter(t, fn)
+	local o = {}
+	for i, v in ipairs(t) do if fn(v, i) then table.insert(o, v) end end
+	return o
+end
+function TU.map(t, fn)
+	local o = {}
+	for i, v in ipairs(t) do o[i] = fn(v, i) end
+	return o
+end
+function TU.reduce(t, fn, init)
+	local acc = init
+	for i, v in ipairs(t) do acc = fn(acc, v, i) end
+	return acc
+end
+function TU.reverse(t)
+	local o = {}
+	for i = #t, 1, -1 do table.insert(o, t[i]) end
+	return o
+end
+function TU.shuffle(t)
+	local o = TU.copy(t)
+	for i = #o, 2, -1 do
+		local j = math.random(i)
+		o[i], o[j] = o[j], o[i]
+	end
+	return o
+end
+function TU.unique(t)
+	local seen, o = {}, {}
+	for _, v in ipairs(t) do
+		if not seen[v] then seen[v] = true; table.insert(o, v) end
+	end
+	return o
+end
+function TU.flatten(t)
+	local o = {}
+	for _, v in ipairs(t) do
+		if type(v) == "table" then
+			for _, s in ipairs(TU.flatten(v)) do table.insert(o, s) end
+		else table.insert(o, v) end
+	end
+	return o
+end
+function TU.first(t) return t[1] end
+function TU.last(t) return t[#t] end
+function TU.sort(t, fn) local o = TU.copy(t); table.sort(o, fn); return o end
+function TU.count(t, fn)
+	local n = 0
+	for i, v in ipairs(t) do if fn(v, i) then n = n + 1 end end
+	return n
+end
+function TU.zip(a, b)
+	local o = {}
+	for i = 1, math.min(#a, #b) do o[i] = {a[i], b[i]} end
+	return o
+end
+ToolxUI.TableUtils = TU
+
+-- =========================================================================
+-- STRING UTILITIES (20+)
+-- =========================================================================
+local SU = {}
+function SU.split(s, sep)
+	local o = {}
+	for part in string.gmatch(s, "([^"..sep.."]+)") do table.insert(o, part) end
+	return o
+end
+function SU.trim(s) return s:match("^%s*(.-)%s*$") end
+function SU.startsWith(s, p) return s:sub(1, #p) == p end
+function SU.endsWith(s, p) return s:sub(-#p) == p end
+function SU.contains(s, p) return s:find(p, 1, true) ~= nil end
+function SU.replace(s, a, b) return s:gsub(a, b) end
+function SU.upper(s) return s:upper() end
+function SU.lower(s) return s:lower() end
+function SU.capitalize(s) return s:sub(1,1):upper()..s:sub(2):lower() end
+function SU.reverse(s) return s:reverse() end
+function SU.repeatStr(s, n) return string.rep(s, n) end
+function SU.padLeft(s, n, c) c = c or " "; while #s < n do s = c..s end; return s end
+function SU.padRight(s, n, c) c = c or " "; while #s < n do s = s..c end; return s end
+function SU.format(fmt, ...) return string.format(fmt, ...) end
+function SU.len(s) return #s end
+function SU.toNumber(s) return tonumber(s) end
+function SU.join(t, sep) return table.concat(t, sep or ", ") end
+function SU.count(s, sub)
+	local n, i = 0, 1
+	while true do
+		local j = s:find(sub, i, true)
+		if not j then break end
+		n = n + 1
+		i = j + #sub
+	end
+	return n
+end
+function SU.mask(s, ch)
+	ch = ch or "*"
+	return string.rep(ch, #s)
+end
+function SU.random(n)
+	local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	local o = {}
+	for _ = 1, n do
+		local i = math.random(1, #chars)
+		table.insert(o, chars:sub(i, i))
+	end
+	return table.concat(o)
+end
+ToolxUI.StringUtils = SU
+
+-- =========================================================================
+-- INSTANCE UTILITIES (15+)
+-- =========================================================================
+local IU = {}
+function IU.new(className, props, parent)
+	local obj = Instance.new(className)
+	if props then
+		for k, v in pairs(props) do
+			if k ~= "Parent" then safe(function() obj[k] = v end) end
+		end
+	end
+	obj.Parent = props and props.Parent or parent
+	return obj
+end
+function IU.find(parent, name) return parent and parent:FindFirstChild(name) end
+function IU.findOfClass(parent, className) return parent and parent:FindFirstChildOfClass(className) end
+function IU.waitFor(parent, name, timeout) return parent:WaitForChild(name, timeout) end
+function IU.destroy(obj) if obj then safe(function() obj:Destroy() end) end
+function IU.clear(parent)
+	if not parent then return end
+	for _, c in ipairs(parent:GetChildren()) do c:Destroy() end
+end
+function IU.getAll(parent, className)
+	local o = {}
+	for _, c in ipairs(parent:GetChildren()) do
+		if not className or c:IsA(className) then table.insert(o, c) end
+	end
+	return o
+end
+function IU.getAllDescendants(parent, className)
+	local o = {}
+	for _, c in ipairs(parent:GetDescendants()) do
+		if not className or c:IsA(className) then table.insert(o, c) end
+	end
+	return o
+end
+function IU.findFirstOfClass(parent, className) return parent:FindFirstChildOfClass(className) end
+function IU.forEach(parent, fn)
+	for _, c in ipairs(parent:GetChildren()) do fn(c) end
+end
+function IU.forEachDescendant(parent, fn)
+	for _, c in ipairs(parent:GetDescendants()) do fn(c) end
+end
+function IU.clone(obj) return obj and obj:Clone() end
+function IU.isA(obj, class) return obj and obj:IsA(class) end
+function IU.setProps(obj, props)
+	for k, v in pairs(props) do safe(function() obj[k] = v end) end
+end
+function IU.getRoot(obj)
+	if not obj then return nil end
+	if obj:IsA("Player") then return obj.Character end
+	if obj:IsA("Model") then return obj end
+	return obj:FindFirstAncestorOfClass("Model") or obj
+end
+ToolxUI.InstanceUtils = IU
+
+-- =========================================================================
+-- CHARACTER UTILITIES (30+)
+-- =========================================================================
+local CHU = {}
+function CHU.getCharacter(plr) return (plr or lp).Character end
+function CHU.getHumanoid(plr)
+	local c = CHU.getCharacter(plr)
+	return c and c:FindFirstChildOfClass("Humanoid")
+end
+function CHU.getRoot(plr)
+	local c = CHU.getCharacter(plr)
+	return c and c:FindFirstChild("HumanoidRootPart")
+end
+function CHU.getHead(plr)
+	local c = CHU.getCharacter(plr)
+	return c and c:FindFirstChild("Head")
+end
+function CHU.getTorso(plr)
+	local c = CHU.getCharacter(plr)
+	if not c then return nil end
+	return c:FindFirstChild("Torso") or c:FindFirstChild("UpperTorso") or c:FindFirstChild("LowerTorso")
+end
+function CHU.getLeftArm(plr)
+	local c = CHU.getCharacter(plr)
+	return c and (c:FindFirstChild("Left Arm") or c:FindFirstChild("LeftHand"))
+end
+function CHU.getRightArm(plr)
+	local c = CHU.getCharacter(plr)
+	return c and (c:FindFirstChild("Right Arm") or c:FindFirstChild("RightHand"))
+end
+function CHU.getLeftLeg(plr)
+	local c = CHU.getCharacter(plr)
+	return c and (c:FindFirstChild("Left Leg") or c:FindFirstChild("LeftFoot"))
+end
+function CHU.getRightLeg(plr)
+	local c = CHU.getCharacter(plr)
+	return c and (c:FindFirstChild("Right Leg") or c:FindFirstChild("RightFoot"))
+end
+function CHU.getPosition(plr)
+	local r = CHU.getRoot(plr)
+	return r and r.Position
+end
+function CHU.getCFrame(plr)
+	local r = CHU.getRoot(plr)
+	return r and r.CFrame
+end
+function CHU.getHealth(plr)
+	local h = CHU.getHumanoid(plr)
+	return h and h.Health or 0
+end
+function CHU.getMaxHealth(plr)
+	local h = CHU.getHumanoid(plr)
+	return h and h.MaxHealth or 0
+end
+function CHU.getHealthPercent(plr)
+	local h = CHU.getHumanoid(plr)
+	if h and h.MaxHealth > 0 then return h.Health / h.MaxHealth end
+	return 0
+end
+function CHU.isAlive(plr) return CHU.getHealth(plr) > 0 end
+function CHU.isDead(plr) return not CHU.isAlive(plr) end
+function CHU.getWalkSpeed(plr)
+	local h = CHU.getHumanoid(plr)
+	return h and h.WalkSpeed or 0
+end
+function CHU.setWalkSpeed(plr, v)
+	local h = CHU.getHumanoid(plr)
+	if h then h.WalkSpeed = v end
+end
+function CHU.getJumpPower(plr)
+	local h = CHU.getHumanoid(plr)
+	return h and h.JumpPower or 0
+end
+function CHU.setJumpPower(plr, v)
+	local h = CHU.getHumanoid(plr)
+	if h then h.JumpPower = v end
+end
+function CHU.jump(plr)
+	local h = CHU.getHumanoid(plr)
+	if h then h.Jump = true end
+end
+function CHU.sit(plr)
+	local h = CHU.getHumanoid(plr)
+	if h then h.Sit = true end
+end
+function CHU.stand(plr)
+	local h = CHU.getHumanoid(plr)
+	if h then h.Sit = false end
+end
+function CHU.kill(plr)
+	local h = CHU.getHumanoid(plr)
+	if h then h.Health = 0 end
+end
+function CHU.heal(plr)
+	local h = CHU.getHumanoid(plr)
+	if h then h.Health = h.MaxHealth end
+end
+function CHU.setHealth(plr, v)
+	local h = CHU.getHumanoid(plr)
+	if h then h.Health = v end
+end
+function CHU.teleport(plr, pos)
+	local r = CHU.getRoot(plr)
+	if r then r.CFrame = CFrame.new(pos) end
+end
+function CHU.teleportTo(plr, target)
+	local r = CHU.getRoot(plr)
+	if r then r.CFrame = CFrame.new(target) end
+end
+function CHU.setCFrame(plr, cf)
+	local r = CHU.getRoot(plr)
+	if r then r.CFrame = cf end
+end
+function CHU.getVelocity(plr)
+	local r = CHU.getRoot(plr)
+	return r and r.AssemblyLinearVelocity or Vector3.zero
+end
+function CHU.setVelocity(plr, v)
+	local r = CHU.getRoot(plr)
+	if r then r.AssemblyLinearVelocity = v end
+end
+function CHU.stop(plr)
+	local r = CHU.getRoot(plr)
+	if r then
+		r.AssemblyLinearVelocity = Vector3.zero
+		r.AssemblyAngularVelocity = Vector3.zero
+	end
+end
+function CHU.getParts(plr)
+	local c = CHU.getCharacter(plr)
+	local o = {}
+	if c then
+		for _, p in ipairs(c:GetChildren()) do
+			if p:IsA("BasePart") then table.insert(o, p) end
+		end
+	end
+	return o
+end
+function CHU.noclip(plr, enable)
+	for _, p in ipairs(CHU.getParts(plr)) do
+		p.CanCollide = not enable
+	end
+end
+function CHU.anchor(plr, v)
+	local r = CHU.getRoot(plr)
+	if r then r.Anchored = v end
+end
+function CHU.freeze(plr, v)
+	local r = CHU.getRoot(plr)
+	if r then
+		r.Anchored = v
+		local h = CHU.getHumanoid(plr)
+		if h then h.PlatformStand = v end
+	end
+end
+ToolxUI.CharacterUtils = CHU
+
+-- =========================================================================
+-- PLAYER UTILITIES (60+)
+-- =========================================================================
+local PU = {}
+function PU.all(excludeLocal)
+	local o = {}
+	for _, p in ipairs(Players:GetPlayers()) do
+		if not excludeLocal or p ~= lp then table.insert(o, p) end
+	end
+	return o
+end
+function PU.byName(n)
+	for _, p in ipairs(Players:GetPlayers()) do if p.Name:lower() == n:lower() then return p end end
+end
+function PU.byDisplayName(n)
+	for _, p in ipairs(Players:GetPlayers()) do if p.DisplayName:lower() == n:lower() then return p end end
+end
+function PU.byId(id)
+	for _, p in ipairs(Players:GetPlayers()) do if p.UserId == id then return p end end
+end
+function PU.byCharacter(char)
+	for _, p in ipairs(Players:GetPlayers()) do if p.Character == char then return p end end
+end
+function PU.byPart(part)
+	if not part then return nil end
+	local char = part:FindFirstAncestorOfClass("Model")
+	return char and PU.byCharacter(char)
+end
+function PU.alive(excludeLocal)
+	local o = {}
+	for _, p in ipairs(Players:GetPlayers()) do
+		if (not excludeLocal or p ~= lp) and isAlive(p) then table.insert(o, p) end
+	end
+	return o
+end
+function PU.dead(excludeLocal)
+	local o = {}
+	for _, p in ipairs(Players:GetPlayers()) do
+		if (not excludeLocal or p ~= lp) and not isAlive(p) then table.insert(o, p) end
+	end
+	return o
+end
+function PU.count() return #Players:GetPlayers() end
+function PU.countAlive() return #PU.alive() end
+function PU.countDead() return #PU.dead() end
+function PU.closest(origin, excludeLocal)
+	origin = origin or CHU.getPosition(lp)
+	if not origin then return nil, math.huge end
+	local near, minD = nil, math.huge
+	for _, p in ipairs(Players:GetPlayers()) do
+		if not excludeLocal or p ~= lp then
+			local pp = CHU.getPosition(p)
+			if pp then
+				local d = (pp-origin).Magnitude
+				if d < minD then minD = d; near = p end
+			end
+		end
+	end
+	return near, minD
+end
+function PU.farthest(origin)
+	origin = origin or CHU.getPosition(lp)
+	if not origin then return nil, 0 end
+	local far, maxD = nil, 0
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= lp then
+			local pp = CHU.getPosition(p)
+			if pp then
+				local d = (pp-origin).Magnitude
+				if d > maxD then maxD = d; far = p end
+			end
+		end
+	end
+	return far, maxD
+end
+function PU.distance(a, b)
+	local pa, pb = CHU.getPosition(a), CHU.getPosition(b)
+	if pa and pb then return (pa-pb).Magnitude end
+	return math.huge
+end
+function PU.sorted(origin, excludeLocal)
+	origin = origin or CHU.getPosition(lp)
+	local o = {}
+	for _, p in ipairs(Players:GetPlayers()) do
+		if not excludeLocal or p ~= lp then
+			local pp = CHU.getPosition(p)
+			local d = (pp and origin) and (pp-origin).Magnitude or math.huge
+			table.insert(o, {player = p, dist = d})
+		end
+	end
+	table.sort(o, function(a,b) return a.dist < b.dist end)
+	return o
+end
+function PU.inRadius(origin, radius)
+	local o = {}
+	if not origin then return o end
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= lp then
+			local pp = CHU.getPosition(p)
+			if pp and (pp-origin).Magnitude <= radius then table.insert(o, p) end
+		end
+	end
+	return o
+end
+function PU.randomPlayer(excludeLocal)
+	local l = PU.all(excludeLocal)
+	return l[math.random(1, #l)]
+end
+function PU.hasTool(p, name)
+	local c = p and p.Character
+	if not c then return false end
+	for _, t in ipairs(c:GetChildren()) do
+		if t:IsA("Tool") and (not name or t.Name == name) then return true end
+	end
+	return false
+end
+function PU.getTools(p)
+	local o = {}
+	local c = p and p.Character
+	if c then
+		for _, t in ipairs(c:GetChildren()) do
+			if t:IsA("Tool") then table.insert(o, t) end
+		end
+	end
+	return o
+end
+function PU.getBackpackTools(p)
+	local o = {}
+	local b = p and p.Backpack
+	if b then
+		for _, t in ipairs(b:GetChildren()) do
+			if t:IsA("Tool") then table.insert(o, t) end
+		end
+	end
+	return o
+end
+function PU.getAllTools(p)
+	local o = {}
+	for _, t in ipairs(PU.getTools(p)) do table.insert(o, t) end
+	for _, t in ipairs(PU.getBackpackTools(p)) do table.insert(o, t) end
+	return o
+end
+function PU.findTool(p, name)
+	for _, t in ipairs(PU.getAllTools(p)) do
+		if t.Name == name then return t end
+	end
+end
+function PU.equip(p, tool)
+	local h = CHU.getHumanoid(p)
+	if h and tool then h:EquipTool(tool) end
+end
+function PU.unequip(p)
+	local h = CHU.getHumanoid(p)
+	if h then h:UnequipTools() end
+end
+function PU.accountAge(p) return p and p.AccountAge or 0 end
+function PU.membership(p)
+	if p and p.MembershipType == Enum.MembershipType.Premium then return "Premium" end
+	return "None"
+end
+function PU.isFriend(p) return p and p:IsFriendsWith(lp.UserId) end
+function PU.team(p) return p and p.Team end
+function PU.teamColor(p) return p and p.TeamColor end
+function PU.byTeam(team)
+	local o = {}
+	for _, p in ipairs(Players:GetPlayers()) do if p.Team == team then table.insert(o, p) end end
+	return o
+end
+function PU.rank(p, groupId) return p and p:GetRankInGroup(groupId) or 0 end
+function PU.role(p, groupId) return p and p:GetRoleInGroup(groupId) or "" end
+function PU.displayName(p) return p and p.DisplayName or "" end
+function PU.userId(p) return p and p.UserId or 0 end
+function PU.isTyping(p)
+	if p == lp and UIS:GetFocusedTextBox() then return true end
+	return false
+end
+function PU.hasCharacter(p) return p and p.Character ~= nil end
+function PU.getCharacter(p) return p and p.Character end
+function PU.getHumanoid(p) return CHU.getHumanoid(p) end
+function PU.getRoot(p) return CHU.getRoot(p) end
+function PU.getHRP(p) return CHU.getRoot(p) end
+function PU.getPosition(p) return CHU.getPosition(p) end
+function PU.getHealth(p) return CHU.getHealth(p) end
+function PU.getMaxHealth(p) return CHU.getMaxHealth(p) end
+function PU.getWalkSpeed(p) return CHU.getWalkSpeed(p) end
+function PU.setWalkSpeed(p, v) CHU.setWalkSpeed(p, v) end
+function PU.setJumpPower(p, v) CHU.setJumpPower(p, v) end
+function PU.kill(p) CHU.kill(p) end
+function PU.teleport(p, pos) CHU.teleport(p, pos) end
+function PU.teleportToPlayer(a, b)
+	local rb = CHU.getRoot(b)
+	if rb then CHU.teleport(a, rb.Position + Vector3.new(0, 3, 0)) end
+end
+function PU.noclip(p, v) CHU.noclip(p, v) end
+function PU.freeze(p, v) CHU.freeze(p, v) end
+function PU.sameTeam(a, b) return a.Team == b.Team end
+function PU.isBot(p) return p and p.UserId < 0 end
+function PU.friends()
+	local o = {}
+	for _, p in ipairs(Players:GetPlayers()) do
+		if PU.isFriend(p) then table.insert(o, p) end
+	end
+	return o
+end
+function PU.nonFriends(excludeLocal)
+	local o = {}
+	for _, p in ipairs(Players:GetPlayers()) do
+		if (not excludeLocal or p ~= lp) and not PU.isFriend(p) then table.insert(o, p) end
+	end
+	return o
+end
+function PU.closestAlive(origin)
+	local l = PU.sorted(origin, true)
+	for _, e in ipairs(l) do
+		if isAlive(e.player) then return e.player, e.dist end
+	end
+end
+function PU.closestDead(origin)
+	local l = PU.sorted(origin, true)
+	for _, e in ipairs(l) do
+		if not isAlive(e.player) then return e.player, e.dist end
+	end
+end
+function PU.watch(p, field, fn)
+	if field == "Character" then return p.CharacterAdded:Connect(fn) end
+	if field == "Health" then
+		local h = CHU.getHumanoid(p)
+		if h then return h:GetPropertyChangedSignal("Health"):Connect(fn) end
+	end
+	if field == "Position" then
+		local r = CHU.getRoot(p)
+		if r then return r:GetPropertyChangedSignal("Position"):Connect(fn) end
+	end
+end
+function PU.watchAll(fn)
+	local conns = {}
+	for _, p in ipairs(Players:GetPlayers()) do
+		local c = PU.watch(p, "Character", function() fn(p) end)
+		if c then table.insert(conns, c) end
+	end
+	return conns
+end
+function PU.onPlayerAdded(fn) return Players.PlayerAdded:Connect(fn) end
+function PU.onPlayerRemoved(fn) return Players.PlayerRemoving:Connect(fn) end
+function PU.getLocalPlayer() return lp end
+function PU.getName(p) return p and p.Name or "" end
+function PU.getUserIdFromName(name)
+	local ok, id = pcall(function() return Players:GetUserIdFromNameAsync(name) end)
+	return ok and id or nil
+end
+function PU.getNameFromUserId(id)
+	local ok, n = pcall(function() return Players:GetNameFromUserIdAsync(id) end)
+	return ok and n or nil
+end
+ToolxUI.PlayerUtils = PU
+
+-- =========================================================================
+-- CAMERA UTILITIES (15+)
+-- =========================================================================
+local CAM = {}
+function CAM.get() return Workspace.CurrentCamera end
+function CAM.getCFrame() local c = CAM.get(); return c and c.CFrame end
+function CAM.getPosition() local c = CAM.get(); return c and c.CFrame.Position end
+function CAM.getLookVector() local c = CAM.get(); return c and c.CFrame.LookVector end
+function CAM.getRightVector() local c = CAM.get(); return c and c.CFrame.RightVector end
+function CAM.getUpVector() local c = CAM.get(); return c and c.CFrame.UpVector end
+function CAM.setCFrame(cf) local c = CAM.get(); if c then c.CFrame = cf end end
+function CAM.setType(t) local c = CAM.get(); if c then c.CameraType = t end end
+function CAM.setSubject(s) local c = CAM.get(); if c then c.CameraSubject = s end end
+function CAM.reset()
+	local c = CAM.get()
+	if c then
+		c.CameraType = Enum.CameraType.Custom
+		local h = CHU.getHumanoid(lp)
+		if h then c.CameraSubject = h end
+	end
+end
+function CAM.zoom(dist)
+	local c = CAM.get()
+	if c then c.CFrame = c.CFrame - c.CFrame.LookVector * dist end
+end
+function CAM.lookAt(pos)
+	local c = CAM.get()
+	if c then c.CFrame = CFrame.new(c.CFrame.Position, pos) end
+end
+function CAM.setFOV(fov)
+	local c = CAM.get()
+	if c then c.FieldOfView = fov end
+end
+function CAM.getFOV()
+	local c = CAM.get(); return c and c.FieldOfView or 70
+end
+function CAM.setDistance(d)
+	local c = CAM.get()
+	if c then c.CFrame = CFrame.new(c.CFrame.Position - c.CFrame.LookVector * d) * (c.CFrame - c.CFrame.Position) end
+end
+ToolxUI.CameraUtils = CAM
+
+-- =========================================================================
+-- SOUND UTILITIES (10+)
+-- =========================================================================
+local SB = {}
+function SB.play(id, vol, pitch)
+	local s = Instance.new("Sound")
+	s.SoundId = "rbxassetid://"..tostring(id):gsub("rbxassetid://","")
+	s.Volume = vol or 1
+	s.PlaybackSpeed = pitch or 1
+	s.Parent = SoundService
+	s:Play()
+	Debris:AddItem(s, 5)
+	return s
+end
+function SB.stop(s) if s then safe(function() s:Stop() end) end end
+function SB.pause(s) if s then safe(function() s:Pause() end) end end
+function SB.resume(s) if s then safe(function() s:Resume() end) end end
+function SB.setVolume(s, v) if s then s.Volume = v end end
+function SB.setPitch(s, p) if s then s.PlaybackSpeed = p end end
+function SB.stopAll()
+	for _, s in ipairs(SoundService:GetChildren()) do
+		if s:IsA("Sound") then safe(function() s:Stop() s:Destroy() end) end
+	end
+end
+function SB.isPlaying(s) return s and s.IsPlaying or false end
+function SB.getTime(s) return s and s.TimePosition or 0 end
+function SB.getLength(s) return s and s.TimeLength or 0 end
+ToolxUI.SoundUtils = SB
+
+-- =========================================================================
+-- NOTIFICATION / TIME / FILE UTILS (15+)
+-- =========================================================================
+local NU = {}
+function NU.now() return tick() end
+function NU.os() return os.time() end
+function NU.format(secs)
+	local m = math.floor(secs/60)
+	local s = math.floor(secs % 60)
+	return string.format("%02d:%02d", m, s)
+end
+function NU.ms() return tick() * 1000 end
+function NU.clock() return os.date("%H:%M:%S") end
+function NU.date() return os.date("%Y-%m-%d") end
+function NU.wait(t) task.wait(t) end
+function NU.delay(t, fn) task.delay(t, fn) end
+function NU.spawn(fn, ...) task.spawn(fn, ...) end
+function NU.defer(fn, ...) task.defer(fn, ...) end
+ToolxUI.TimeUtils = NU
+
+local FU = {}
+function FU.exists(p) return isfile(p) end
+function FU.folderExists(p) return isfolder(p) end
+function FU.read(p)
+	local ok, d = pcall(readfile, p)
+	return ok and d or nil
+end
+function FU.write(p, d)
+	local ok = pcall(writefile, p, d)
+	return ok
+end
+function FU.append(p, d)
+	local ok = pcall(appendfile, p, d)
+	return ok
+end
+function FU.del(p)
+	local ok = pcall(delfile, p)
+	return ok
+end
+function FU.mkdir(p)
+	local ok = pcall(makefolder, p)
+	return ok
+end
+function FU.rmdir(p)
+	local ok = pcall(delfolder, p)
+	return ok
+end
+function FU.list(p)
+	local ok, l = pcall(listfiles, p)
+	return ok and l or {}
+end
+ToolxUI.FileUtils = FU
+
+-- =========================================================================
+-- RAYCAST UTILITIES (5+)
+-- =========================================================================
+local RU = {}
+function RU.cast(origin, dir, ignore)
+	local p = RaycastParams.new()
+	p.FilterType = Enum.RaycastFilterType.Exclude
+	p.FilterDescendantsInstances = ignore or {lp.Character}
+	local r = Workspace:Raycast(origin, dir, p)
+	return r
+end
+function RU.castBetween(a, b, ignore)
+	return RU.cast(a, b - a, ignore)
+end
+function RU.getPartInFront(maxDist, ignore)
+	local cam = CAM.get()
+	if not cam then return nil end
+	local r = RU.cast(cam.CFrame.Position, cam.CFrame.LookVector * (maxDist or 500), ignore)
+	return r and r.Instance, r and r.Position
+end
+function RU.isVisible(target, ignore)
+	local cam = CAM.get()
+	if not cam then return false end
+	local p = RU.cast(cam.CFrame.Position, (target - cam.CFrame.Position), ignore)
+	if not p then return true end
+	return (p.Position - target).Magnitude < 1
+end
+function RU.raycastAll(origin, dir, ignore)
+	local p = RaycastParams.new()
+	p.FilterType = Enum.RaycastFilterType.Exclude
+	p.FilterDescendantsInstances = ignore or {lp.Character}
+	return Workspace:Raycast(origin, dir, p)
+end
+ToolxUI.RayUtils = RU
+
+-- =========================================================================
+-- FONTS / ICONS / THEMES
+-- =========================================================================
 local function tf(n, w) local f; safe(function() f = Font.fromName(n, w or Enum.FontWeight.Regular) end); return f end
 local FONTS = {
 	Title = tf("Zekton", Enum.FontWeight.Bold) or Enum.Font.GothamBlack,
@@ -46,7 +977,6 @@ local function setFont(o, f)
 	else safe(function() o.FontFace = f end) end
 end
 
--- ============= CONSTANTS =============
 local ICONS = {
 	Gear = "rbxassetid://6031280882",
 	Min = "rbxassetid://6031090990",
@@ -64,9 +994,19 @@ local THEMES = {
 	Void = {Bg=Color3.fromRGB(8,0,20), Panel=Color3.fromRGB(15,5,30), Text=Color3.fromRGB(230,200,255), Sub=Color3.fromRGB(150,100,200), Accent=Color3.fromRGB(180,40,255), Good=Color3.fromRGB(120,60,220), Info=Color3.fromRGB(80,80,255), Warn=Color3.fromRGB(255,120,60), Danger=Color3.fromRGB(220,30,90)},
 	Blood = {Bg=Color3.fromRGB(15,0,0), Panel=Color3.fromRGB(25,5,5), Text=Color3.fromRGB(255,200,200), Sub=Color3.fromRGB(200,100,100), Accent=Color3.fromRGB(255,0,0), Good=Color3.fromRGB(180,40,40), Info=Color3.fromRGB(120,30,30), Warn=Color3.fromRGB(255,100,0), Danger=Color3.fromRGB(255,20,20)},
 	Ocean = {Bg=Color3.fromRGB(0,10,20), Panel=Color3.fromRGB(5,20,35), Text=Color3.fromRGB(200,230,255), Sub=Color3.fromRGB(100,150,200), Accent=Color3.fromRGB(0,150,255), Good=Color3.fromRGB(30,200,150), Info=Color3.fromRGB(0,120,255), Warn=Color3.fromRGB(255,150,30), Danger=Color3.fromRGB(255,50,80)},
+	Sunset = {Bg=Color3.fromRGB(20,5,15), Panel=Color3.fromRGB(35,10,25), Text=Color3.fromRGB(255,220,200), Sub=Color3.fromRGB(220,140,120), Accent=Color3.fromRGB(255,100,50), Good=Color3.fromRGB(230,180,60), Info=Color3.fromRGB(180,60,140), Warn=Color3.fromRGB(255,150,30), Danger=Color3.fromRGB(220,40,80)},
+	Forest = {Bg=Color3.fromRGB(5,15,5), Panel=Color3.fromRGB(10,25,10), Text=Color3.fromRGB(200,255,200), Sub=Color3.fromRGB(120,200,120), Accent=Color3.fromRGB(50,200,80), Good=Color3.fromRGB(80,220,100), Info=Color3.fromRGB(60,140,180), Warn=Color3.fromRGB(230,180,40), Danger=Color3.fromRGB(200,40,40)},
+	Gold = {Bg=Color3.fromRGB(15,10,0), Panel=Color3.fromRGB(30,20,0), Text=Color3.fromRGB(255,240,200), Sub=Color3.fromRGB(200,170,100), Accent=Color3.fromRGB(255,200,50), Good=Color3.fromRGB(200,180,40), Info=Color3.fromRGB(180,140,20), Warn=Color3.fromRGB(255,120,20), Danger=Color3.fromRGB(220,60,20)},
+	Pastel = {Bg=Color3.fromRGB(250,245,250), Panel=Color3.fromRGB(240,230,240), Text=Color3.fromRGB(80,60,80), Sub=Color3.fromRGB(150,130,150), Accent=Color3.fromRGB(255,150,200), Good=Color3.fromRGB(150,220,170), Info=Color3.fromRGB(160,200,255), Warn=Color3.fromRGB(255,210,150), Danger=Color3.fromRGB(255,150,150)},
 }
 
--- ============= EFFECTS =============
+ToolxUI.Fonts = FONTS
+ToolxUI.Icons = ICONS
+ToolxUI.Themes = THEMES
+
+-- =========================================================================
+-- EFFECTS ENGINE
+-- =========================================================================
 local shineList, spinList = {}, {}
 local function addShine(g, spd) if not g then return end; table.insert(shineList, {grad=g, speed=spd or 0.015, dir=1}); safe(function() g.Offset = Vector2.new(-1,0) end) end
 local function addSpin(o, spd) if not o then return end; table.insert(spinList, {obj=o, speed=spd or 1}) end
@@ -86,7 +1026,6 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 end)
 
--- ============= EASING =============
 local E = {
 	QOut = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
 	QIO = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.InOut),
@@ -94,8 +1033,8 @@ local E = {
 	SIO = TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
 	Lin = TweenInfo.new(0.18, Enum.EasingStyle.Linear),
 }
+ToolxUI.Easing = E
 
--- ============= FX GUI =============
 local FxGui
 local function initFx()
 	if FxGui then return FxGui end
@@ -110,7 +1049,6 @@ local function initFx()
 end
 initFx()
 
--- ============= NOTIFIER =============
 local NotifGui, NotifHolder
 local function initNotif()
 	if NotifGui then return end
@@ -192,216 +1130,11 @@ local function defaultNotify(text, color, dur)
 		holder:Destroy()
 	end)
 end
+ToolxUI.Notify = function(text, color, dur) defaultNotify(text, color, dur) end
 
--- ============= PLAYER UTILITIES (30+) =============
-local PU = {}
-
-function PU.GetPlayers(excludeLocal)
-	local list = {}
-	for _, p in ipairs(Players:GetPlayers()) do
-		if not excludeLocal or p ~= lp then table.insert(list, p) end
-	end
-	return list
-end
-function PU.GetPlayerByName(name)
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p.Name:lower() == name:lower() then return p end
-	end
-end
-function PU.GetPlayerByDisplayName(name)
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p.DisplayName:lower() == name:lower() then return p end
-	end
-end
-function PU.GetPlayerById(id)
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p.UserId == id then return p end
-	end
-end
-function PU.GetPlayerCharacter(p) return p and p.Character end
-function PU.GetPlayerHumanoid(p) local c = p and p.Character; return c and c:FindFirstChildOfClass("Humanoid") end
-function PU.GetPlayerRoot(p) local c = p and p.Character; return c and c:FindFirstChild("HumanoidRootPart") end
-function PU.IsPlayerAlive(p)
-	local h = PU.GetPlayerHumanoid(p)
-	return h and h.Health > 0
-end
-function PU.GetPlayerHealth(p)
-	local h = PU.GetPlayerHumanoid(p)
-	return h and h.Health or 0
-end
-function PU.GetPlayerMaxHealth(p)
-	local h = PU.GetPlayerHumanoid(p)
-	return h and h.MaxHealth or 0
-end
-function PU.GetPlayerTeam(p) return p and p.Team end
-function PU.GetPlayerTeamColor(p) return p and p.TeamColor end
-function PU.GetPlayerPosition(p)
-	local r = PU.GetPlayerRoot(p)
-	return r and r.Position or nil
-end
-function PU.GetPlayerDistance(p)
-	local r1 = PU.GetPlayerRoot(lp)
-	local r2 = PU.GetPlayerRoot(p)
-	if r1 and r2 then return (r1.Position - r2.Position).Magnitude end
-	return math.huge
-end
-function PU.GetClosestPlayer(excludeLocal)
-	local closest, minD = nil, math.huge
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p ~= lp then
-			local d = PU.GetPlayerDistance(p)
-			if d < minD then minD = d; closest = p end
-		end
-	end
-	return closest, minD
-end
-function PU.GetFarthestPlayer()
-	local far, maxD = nil, 0
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p ~= lp then
-			local d = PU.GetPlayerDistance(p)
-			if d > maxD then maxD = d; far = p end
-		end
-	end
-	return far, maxD
-end
-function PU.GetSortedByDistance()
-	local list = {}
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p ~= lp then table.insert(list, {player = p, dist = PU.GetPlayerDistance(p)}) end
-	end
-	table.sort(list, function(a, b) return a.dist < b.dist end)
-	return list
-end
-function PU.GetAllAlive()
-	local t = {}
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p ~= lp and PU.IsPlayerAlive(p) then table.insert(t, p) end
-	end
-	return t
-end
-function PU.GetAllDead()
-	local t = {}
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p ~= lp and not PU.IsPlayerAlive(p) then table.insert(t, p) end
-	end
-	return t
-end
-function PU.GetRandomPlayer()
-	local list = PU.GetPlayers(true)
-	return list[math.random(1, #list)]
-end
-function PU.GetPlayerFromCharacter(char)
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p.Character == char then return p end
-	end
-end
-function PU.GetPlayerByPart(part)
-	local char = part and part:FindFirstAncestorOfClass("Model")
-	if char then return PU.GetPlayerFromCharacter(char) end
-end
-function PU.GetPlayersInRadius(origin, radius)
-	local t = {}
-	if not origin then return t end
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p ~= lp then
-			local pos = PU.GetPlayerPosition(p)
-			if pos and (pos - origin).Magnitude <= radius then table.insert(t, p) end
-		end
-	end
-	return t
-end
-function PU.GetNearestTo(pos)
-	local near, minD = nil, math.huge
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p ~= lp then
-			local pp = PU.GetPlayerPosition(p)
-			if pp then
-				local d = (pp - pos).Magnitude
-				if d < minD then minD = d; near = p end
-			end
-		end
-	end
-	return near, minD
-end
-function PU.GetHealthPercent(p)
-	local h = PU.GetPlayerHumanoid(p)
-	if h then return h.Health / h.MaxHealth end
-	return 0
-end
-function PU.HasTool(p, name)
-	local c = p and p.Character
-	if not c then return false end
-	for _, t in ipairs(c:GetChildren()) do
-		if t:IsA("Tool") and (not name or t.Name == name) then return true end
-	end
-	return false
-end
-function PU.GetTools(p)
-	local t = {}
-	local c = p and p.Character
-	if c then
-		for _, o in ipairs(c:GetChildren()) do
-			if o:IsA("Tool") then table.insert(t, o) end
-		end
-	end
-	return t
-end
-function PU.GetBackpackTools(p)
-	local t = {}
-	local b = p and p.Backpack
-	if b then
-		for _, o in ipairs(b:GetChildren()) do
-			if o:IsA("Tool") then table.insert(t, o) end
-		end
-	end
-	return t
-end
-function PU.GetAllTools(p)
-	local t = {}
-	for _, o in ipairs(PU.GetTools(p)) do table.insert(t, o) end
-	for _, o in ipairs(PU.GetBackpackTools(p)) do table.insert(t, o) end
-	return t
-end
-function PU.HasBackpack(p) return p and p.Backpack end
-function PU.GetCharacterParts(p)
-	local c = p and p.Character
-	local t = {}
-	if c then
-		for _, o in ipairs(c:GetChildren()) do
-			if o:IsA("BasePart") then table.insert(t, o) end
-		end
-	end
-	return t
-end
-function PU.IsPlayerTyping(p)
-	if p == lp and UIS:GetFocusedTextBox() then return true end
-	return false
-end
-function PU.GetPlayerAccountAge(p) return p and p.AccountAge or 0 end
-function PU.GetPlayerMembership(p)
-	if p.MembershipType == Enum.MembershipType.Premium then return "Premium" end
-	return "None"
-end
-function PU.IsFriend(p) return p and p:IsFriendsWith(lp.UserId) end
-function PU.GetPlayerTeam_ById(id)
-	for _, p in ipairs(Players:GetPlayers()) do if p.UserId == id then return p.Team end end
-end
-function PU.GetRoleInGroup(p, groupId)
-	return p and p:GetRoleInGroup(groupId)
-end
-function PU.GetRankInGroup(p, groupId)
-	return p and p:GetRankInGroup(groupId)
-end
-function PU.GetPlayersByTeam(team)
-	local t = {}
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p.Team == team then table.insert(t, p) end
-	end
-	return t
-end
-
--- ============= WINDOW CLASS =============
+-- =========================================================================
+-- WINDOW CLASS
+-- =========================================================================
 function ToolxUI:CreateWindow(opt)
 	opt = opt or {}
 	local W = {}
@@ -409,16 +1142,16 @@ function ToolxUI:CreateWindow(opt)
 	W.Config = {
 		Title = opt.Title or "ToolxUI",
 		Subtitle = opt.Subtitle or "",
-		Width = opt.Width or 240,
-		Height = opt.Height or 320,
+		Width = opt.Width or 260,
+		Height = opt.Height or 360,
 		Accent = opt.Accent or Color3.fromRGB(220,20,20),
 		Theme = opt.Theme or "Dark",
 		Key = opt.Key,
 		KeyHint = opt.KeyHint or "",
 		Draggable = opt.Draggable ~= false,
 		Resizable = opt.Resizable ~= false,
-		MinWidth = 180, MaxWidth = 600,
-		MinHeight = 160, MaxHeight = 700,
+		MinWidth = 180, MaxWidth = 700,
+		MinHeight = 160, MaxHeight = 800,
 		Effects = {Sound=true, Particles=true, Shockwave=true, Fire=true},
 		Language = opt.Language or "en",
 		Debug = opt.Debug or false,
@@ -431,8 +1164,8 @@ function ToolxUI:CreateWindow(opt)
 	W.Keybinds = {}
 	W.Parent = opt.Parent or getParent()
 	W.Tooltips = {}
+	W.ToggleState = {}
 
-	-- Sounds
 	W.Sounds = {}
 	W.Sounds.Click = Instance.new("Sound", FxGui)
 	W.Sounds.Click.SoundId = CLICK
@@ -446,7 +1179,6 @@ function ToolxUI:CreateWindow(opt)
 	W.Sounds.Error.Volume = 0.35
 	W.Sounds.Error.PlaybackSpeed = 0.7
 
-	-- GUI
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "ToolxUI_"..W.Config.Title
 	gui.ResetOnSpawn = false
@@ -456,7 +1188,6 @@ function ToolxUI:CreateWindow(opt)
 	gui.Parent = W.Parent
 	W.Gui = gui
 
-	-- Toggle Button
 	local tog = Instance.new("TextButton", gui)
 	tog.Size = UDim2.new(0, 42, 0, 42)
 	tog.Position = UDim2.new(0, 12, 0.5, -21)
@@ -483,11 +1214,10 @@ function ToolxUI:CreateWindow(opt)
 	tst.Color = W.Config.Accent
 	tst.Thickness = 1.5
 	local tstg = Instance.new("UIGradient", tst)
-	tstg.Color = ColorSequence.new(W.Config.Accent, darken(W.Config.Accent, 100), W.Config.Accent)
+	tstg.Color = ColorSequence.new(W.Config.Accent, CU.darken(W.Config.Accent, 100), W.Config.Accent)
 	addSpin(tstg, 1)
 	W.ToggleBtn = tog
 
-	-- Main Window
 	local main = Instance.new("Frame", gui)
 	main.Size = UDim2.new(0, W.Config.Width, 0, W.Config.Height)
 	main.Position = UDim2.new(0.5, -W.Config.Width/2, 0.5, -W.Config.Height/2)
@@ -498,7 +1228,6 @@ function ToolxUI:CreateWindow(opt)
 	Instance.new("UICorner", main).CornerRadius = UDim.new(0, 4)
 	W.Main = main
 
-	-- Shine overlay
 	local sh = Instance.new("Frame", main)
 	sh.Size = UDim2.new(1,0,1,0)
 	sh.BackgroundColor3 = Color3.fromRGB(255,255,255)
@@ -511,24 +1240,21 @@ function ToolxUI:CreateWindow(opt)
 	shg.Rotation = 30
 	addShine(shg, 0.012)
 
-	-- Stroke
 	local stk = Instance.new("UIStroke", main)
 	stk.Thickness = 2
 	stk.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	local stkg = Instance.new("UIGradient", stk)
-	stkg.Color = ColorSequence.new(W.Config.Accent, brighten(W.Config.Accent, 70), W.Config.Accent)
+	stkg.Color = ColorSequence.new(W.Config.Accent, CU.brighten(W.Config.Accent, 70), W.Config.Accent)
 	addSpin(stkg, 1.2)
 	W.StrokeGrad = stkg
 	W.Stroke = stk
 
-	-- BG gradient
 	local bg = Instance.new("UIGradient", main)
-	bg.Color = ColorSequence.new(darken(W.Config.Accent, 200), Color3.fromRGB(8,8,8), darken(W.Config.Accent, 200))
+	bg.Color = ColorSequence.new(CU.darken(W.Config.Accent, 200), Color3.fromRGB(8,8,8), CU.darken(W.Config.Accent, 200))
 	bg.Rotation = 45
 	addSpin(bg, 0.8)
 	W.BgGrad = bg
 
-	-- Title
 	local title = Instance.new("TextLabel", main)
 	title.Size = UDim2.new(1, -72, 0, 26)
 	title.Position = UDim2.new(0, 6, 0, 2)
@@ -541,7 +1267,6 @@ function ToolxUI:CreateWindow(opt)
 	title.ZIndex = 5
 	W.TitleLbl = title
 
-	-- Gear button
 	local gear = Instance.new("ImageButton", main)
 	gear.Size = UDim2.new(0, 26, 0, 26)
 	gear.Position = UDim2.new(1, -58, 0, 2)
@@ -552,7 +1277,6 @@ function ToolxUI:CreateWindow(opt)
 	gear.ZIndex = 5
 	W.GearBtn = gear
 
-	-- Min button
 	local minB = Instance.new("ImageButton", main)
 	minB.Size = UDim2.new(0, 26, 0, 26)
 	minB.Position = UDim2.new(1, -30, 0, 2)
@@ -565,7 +1289,6 @@ function ToolxUI:CreateWindow(opt)
 	Instance.new("UICorner", minB).CornerRadius = UDim.new(0, 4)
 	W.MinBtn = minB
 
-	-- Tab bar
 	local tabBar = Instance.new("ScrollingFrame", main)
 	tabBar.Size = UDim2.new(1, -12, 0, 30)
 	tabBar.Position = UDim2.new(0, 6, 0, 32)
@@ -586,7 +1309,6 @@ function ToolxUI:CreateWindow(opt)
 	tbp.PaddingTop = UDim.new(0, 3)
 	W.TabBar = tabBar
 
-	-- Content area (shared frame, we swap children visibility)
 	local content = Instance.new("Frame", main)
 	content.Size = UDim2.new(1, -12, 1, -72)
 	content.Position = UDim2.new(0, 6, 0, 68)
@@ -594,7 +1316,6 @@ function ToolxUI:CreateWindow(opt)
 	content.ZIndex = 5
 	W.ContentHolder = content
 
-	-- SOUNDS
 	function W:PlayClick(p)
 		if not self.Config.Effects.Sound then return end
 		local s = self.Sounds.Click:Clone()
@@ -618,11 +1339,10 @@ function ToolxUI:CreateWindow(opt)
 		task.delay(1, function() s:Destroy() end)
 	end
 
-	-- EFFECTS
 	function W:BurstAt(x, y, cA, cB, count, dist)
 		if not self.Config.Effects.Particles then return end
 		count = count or 8; dist = dist or 25
-		cA = cA or self.Config.Accent; cB = cB or darken(self.Config.Accent, 120)
+		cA = cA or self.Config.Accent; cB = cB or CU.darken(self.Config.Accent, 120)
 		for _ = 1, count do
 			task.spawn(function()
 				local p = Instance.new("Frame", FxGui)
@@ -652,7 +1372,7 @@ function ToolxUI:CreateWindow(opt)
 		if not self.Config.Effects.Shockwave then return end
 		dur = dur or 0.7
 		cA = cA or self.Config.Accent
-		cB = cB or darken(self.Config.Accent, 120)
+		cB = cB or CU.darken(self.Config.Accent, 120)
 		local function ring(delay2, sm, thick)
 			task.delay(delay2, function()
 				local r = Instance.new("Frame", FxGui)
@@ -825,29 +1545,25 @@ function ToolxUI:CreateWindow(opt)
 		end)
 	end
 
-	-- WINDOW METHODS
 	function W:SetAccent(color)
 		self.Config.Accent = color
 		self.Theme.Accent = color
-		self.StrokeGrad.Color = ColorSequence.new(color, brighten(color, 70), color)
-		self.BgGrad.Color = ColorSequence.new(darken(color, 200), Color3.fromRGB(8,8,8), darken(color, 200))
+		self.StrokeGrad.Color = ColorSequence.new(color, CU.brighten(color, 70), color)
+		self.BgGrad.Color = ColorSequence.new(CU.darken(color, 200), Color3.fromRGB(8,8,8), CU.darken(color, 200))
 		self.TitleLbl.TextColor3 = color
 		self.ToggleBtn.TextColor3 = color
 		self.GearBtn.ImageColor3 = color
 		self.MinBtn.ImageColor3 = color
 	end
-
 	function W:SetSize(w, h)
-		w = clamp(w, self.Config.MinWidth, self.Config.MaxWidth)
-		h = clamp(h, self.Config.MinHeight, self.Config.MaxHeight)
+		w = MU.clamp(w, self.Config.MinWidth, self.Config.MaxWidth)
+		h = MU.clamp(h, self.Config.MinHeight, self.Config.MaxHeight)
 		self.Config.Width = w; self.Config.Height = h
 		self.Main.Size = UDim2.new(0, w, 0, h)
 		self.Main.Position = UDim2.new(0.5, -w/2, 0.5, -h/2)
 	end
-	function W:SetTitle(text)
-		self.Config.Title = text
-		self.TitleLbl.Text = text
-	end
+	function W:SetTitle(text) self.Config.Title = text; self.TitleLbl.Text = text end
+	function W:SetSubtitle(text) self.Config.Subtitle = text end
 	function W:SetTheme(name)
 		local t = THEMES[name]
 		if not t then return end
@@ -923,7 +1639,6 @@ function ToolxUI:CreateWindow(opt)
 		if self.TooltipGui then safe(function() self.TooltipGui:Destroy() end) end
 	end
 
-	-- Wire toggle button
 	local open, cd = false, false
 	tog.MouseButton1Click:Connect(function()
 		if cd then return end
@@ -956,13 +1671,12 @@ function ToolxUI:CreateWindow(opt)
 	end)
 	W.IsOpen = function() return open end
 
-	-- Minimize
 	local minimized = false
 	minB.MouseButton1Click:Connect(function()
 		W:PlayClick()
 		minimized = not minimized
 		minB.Image = minimized and ICONS.Max or ICONS.Min
-		W:Shockwave(minB, 20, W.Config.Accent, darken(W.Config.Accent, 100), 0.55)
+		W:Shockwave(minB, 20, W.Config.Accent, CU.darken(W.Config.Accent, 100), 0.55)
 		W:BurstAt(minB.AbsolutePosition.X + minB.AbsoluteSize.X/2 - FxGui.AbsolutePosition.X,
 			minB.AbsolutePosition.Y + minB.AbsoluteSize.Y/2 - FxGui.AbsolutePosition.Y,
 			Color3.fromRGB(255,100,100), Color3.fromRGB(150,0,0), 8, 25)
@@ -974,7 +1688,6 @@ function ToolxUI:CreateWindow(opt)
 		content.Visible = not minimized
 	end)
 
-	-- Draggable
 	if W.Config.Draggable then
 		local drg, ds, sp = false, nil, nil
 		main.InputBegan:Connect(function(i)
@@ -993,7 +1706,6 @@ function ToolxUI:CreateWindow(opt)
 		end)
 	end
 
-	-- Tab API
 	function W:CreateTab(name)
 		local tb = {}
 		tb.Name = name
@@ -1012,7 +1724,6 @@ function ToolxUI:CreateWindow(opt)
 		Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
 		tb.Button = btn
 
-		-- Content: ScrollingFrame with UIListLayout
 		local scroll = Instance.new("ScrollingFrame", content)
 		scroll.Size = UDim2.new(1, 0, 1, 0)
 		scroll.BackgroundTransparency = 1
@@ -1040,11 +1751,8 @@ function ToolxUI:CreateWindow(opt)
 
 		function tb:SetActive(v)
 			scroll.Visible = v
-			if v then
-				btn.BackgroundColor3 = W.Config.Accent
-			else
-				btn.BackgroundColor3 = Color3.fromRGB(28,10,10)
-			end
+			if v then btn.BackgroundColor3 = W.Config.Accent
+			else btn.BackgroundColor3 = Color3.fromRGB(28,10,10) end
 		end
 
 		btn.MouseButton1Click:Connect(function()
@@ -1061,18 +1769,10 @@ function ToolxUI:CreateWindow(opt)
 	return W
 end
 
--- ============= COMPONENT BUILDERS (attach to Tab) =============
+-- =========================================================================
+-- TAB COMPONENT BUILDERS (attached via wrapper)
+-- =========================================================================
 local Tab = {}
-
-function Tab:_newHolder(order)
-	local f = Instance.new("Frame")
-	f.Size = UDim2.new(1, 0, 0, 28)
-	f.BackgroundTransparency = 1
-	f.LayoutOrder = order
-	f.ZIndex = 6
-	f.Parent = self.Content
-	return f
-end
 
 function Tab:_styledButton(text, color, height)
 	local b = Instance.new("TextButton")
@@ -1089,7 +1789,7 @@ function Tab:_styledButton(text, color, height)
 	b.Parent = self.Content
 	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
 	local g = Instance.new("UIGradient", b)
-	g.Color = ColorSequence.new(color, brighten(color, 40), color)
+	g.Color = ColorSequence.new(color, CU.brighten(color, 40), color)
 	g.Rotation = 30
 	local sh = Instance.new("Frame", b)
 	sh.Size = UDim2.new(1,0,1,0)
@@ -1110,19 +1810,9 @@ function Tab:CreateButton(cfg)
 	cfg = cfg or {}
 	local W = self.Window
 	local b = self:_styledButton(cfg.Text or "Button", cfg.Color or W.Config.Accent, cfg.Height or 28)
-	b.MouseEnter:Connect(function()
-		W:PlayHover()
-		local base = b:GetAttribute("BaseColor")
-		TweenService:Create(b, E.SIO, {BackgroundColor3 = brighten(base, 35)}):Play()
-	end)
-	b.MouseLeave:Connect(function()
-		local base = b:GetAttribute("BaseColor")
-		TweenService:Create(b, E.SIO, {BackgroundColor3 = base}):Play()
-	end)
-	b.MouseButton1Click:Connect(function()
-		W:PlayClick()
-		if cfg.Callback then safe(cfg.Callback, b) end
-	end)
+	b.MouseEnter:Connect(function() W:PlayHover(); TweenService:Create(b, E.SIO, {BackgroundColor3 = CU.brighten(b:GetAttribute("BaseColor"), 35)}):Play() end)
+	b.MouseLeave:Connect(function() TweenService:Create(b, E.SIO, {BackgroundColor3 = b:GetAttribute("BaseColor")}):Play() end)
+	b.MouseButton1Click:Connect(function() W:PlayClick(); if cfg.Callback then safe(cfg.Callback, b) end end)
 	if cfg.Tooltip then W:AttachTooltip(b, cfg.Tooltip) end
 	return b
 end
@@ -1145,7 +1835,6 @@ function Tab:CreateToggle(cfg)
 	b.Parent = self.Content
 	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
 	b:SetAttribute("BaseColor", b.BackgroundColor3)
-	local getVal = function() return state end
 	b.MouseButton1Click:Connect(function()
 		W:PlayClick()
 		state = not state
@@ -1155,24 +1844,17 @@ function Tab:CreateToggle(cfg)
 		b.Text = (cfg.Text or "Toggle")..": "..(state and "ON" or "OFF")
 		if cfg.Callback then safe(cfg.Callback, state) end
 	end)
-	b.MouseEnter:Connect(function()
-		W:PlayHover()
-		local base = b:GetAttribute("BaseColor")
-		TweenService:Create(b, E.SIO, {BackgroundColor3 = brighten(base, 35)}):Play()
-	end)
-	b.MouseLeave:Connect(function()
-		local base = b:GetAttribute("BaseColor")
-		TweenService:Create(b, E.SIO, {BackgroundColor3 = base}):Play()
-	end)
+	b.MouseEnter:Connect(function() W:PlayHover(); TweenService:Create(b, E.SIO, {BackgroundColor3 = CU.brighten(b:GetAttribute("BaseColor"), 35)}):Play() end)
+	b.MouseLeave:Connect(function() TweenService:Create(b, E.SIO, {BackgroundColor3 = b:GetAttribute("BaseColor")}):Play() end)
 	if cfg.Tooltip then W:AttachTooltip(b, cfg.Tooltip) end
-	return b, getVal
+	return b, function() return state end
 end
 
 function Tab:CreateSlider(cfg)
 	cfg = cfg or {}
 	local W = self.Window
 	local min, max = cfg.Min or 0, cfg.Max or 100
-	local val = clamp(cfg.Default or min, min, max)
+	local val = MU.clamp(cfg.Default or min, min, max)
 	local holder = Instance.new("Frame")
 	holder.Size = UDim2.new(1, 0, 0, 38)
 	holder.BackgroundTransparency = 1
@@ -1205,27 +1887,22 @@ function Tab:CreateSlider(cfg)
 	Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
 	local dragging = false
 	local function upd(x)
-		local pos = clamp((x - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
-		val = round(min + (max-min) * pos)
+		local pos = MU.clamp((x - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+		val = MU.round(min + (max-min) * pos)
 		fill.Size = UDim2.new(pos, 0, 1, 0)
 		lbl.Text = (cfg.Text or "Slider")..": "..tostring(val)
 		if cfg.Callback then safe(cfg.Callback, val) end
 	end
 	track.InputBegan:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
-			upd(i.Position.X)
-		end
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging = true; upd(i.Position.X) end
 	end)
 	UIS.InputChanged:Connect(function(i)
-		if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-			upd(i.Position.X)
-		end
+		if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then upd(i.Position.X) end
 	end)
 	UIS.InputEnded:Connect(function(i)
 		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging = false end
 	end)
-	return holder, function() return val end, function(v) val = v; upd(track.AbsolutePosition.X + (v-min)/(max-min)*track.AbsoluteSize.X) end
+	return holder, function() return val end
 end
 
 function Tab:CreateTextBox(cfg)
@@ -1250,7 +1927,6 @@ function Tab:CreateTextBox(cfg)
 		W:PlayClick(1.2)
 		if cfg.Callback then safe(cfg.Callback, b.Text) end
 	end)
-	if cfg.Tooltip then W:AttachTooltip(b, cfg.Tooltip) end
 	return b
 end
 
@@ -1274,7 +1950,7 @@ function Tab:CreateNumberInput(cfg)
 	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
 	b.FocusLost:Connect(function()
 		local n = tonumber(b.Text) or (cfg.Default or 0)
-		n = clamp(n, cfg.Min or -math.huge, cfg.Max or math.huge)
+		n = MU.clamp(n, cfg.Min or -math.huge, cfg.Max or math.huge)
 		b.Text = tostring(n)
 		if cfg.Callback then safe(cfg.Callback, n) end
 	end)
@@ -1428,7 +2104,7 @@ function Tab:CreateSection(text)
 	lbl.LayoutOrder = self:GetNextOrder()
 	lbl.Parent = self.Content
 	local g = Instance.new("UIGradient", lbl)
-	g.Color = ColorSequence.new(W.Config.Accent, brighten(W.Config.Accent, 80), W.Config.Accent)
+	g.Color = ColorSequence.new(W.Config.Accent, CU.brighten(W.Config.Accent, 80), W.Config.Accent)
 	g.Rotation = 45
 	addShine(g, 0.02)
 	return lbl
@@ -1449,10 +2125,6 @@ function Tab:CreateLabel(text, cfg)
 	lbl.ZIndex = 6
 	lbl.LayoutOrder = self:GetNextOrder()
 	lbl.Parent = self.Content
-	if cfg.Wrap then
-		lbl.AutomaticSize = Enum.AutomaticSize.Y
-		lbl.Size = UDim2.new(1, 0, 0, 0)
-	end
 	return lbl
 end
 
@@ -1592,9 +2264,7 @@ function Tab:CreateRadio(cfg)
 		b.MouseButton1Click:Connect(function()
 			W:PlayClick()
 			selected = opt
-			for k, btn in pairs(buttons) do
-				btn.Text = (k == selected and "◉ " or "○ ")..tostring(k)
-			end
+			for k, btn in pairs(buttons) do btn.Text = (k == selected and "◉ " or "○ ")..tostring(k) end
 			if cfg.Callback then safe(cfg.Callback, opt) end
 		end)
 	end
@@ -1642,7 +2312,7 @@ function Tab:CreateColorPicker(cfg)
 	cfg = cfg or {}
 	local W = self.Window
 	local holder = Instance.new("Frame")
-	holder.Size = UDim2.new(1, 0, 0, 76)
+	holder.Size = UDim2.new(1, 0, 0, 78)
 	holder.BackgroundTransparency = 1
 	holder.LayoutOrder = self:GetNextOrder()
 	holder.Parent = self.Content
@@ -1679,17 +2349,14 @@ function Tab:CreateColorPicker(cfg)
 		s.ZIndex = 6
 		s.LayoutOrder = i
 		Instance.new("UICorner", s).CornerRadius = UDim.new(0, 4)
-		s.MouseButton1Click:Connect(function()
-			W:PlayClick()
-			if cfg.Callback then safe(cfg.Callback, c) end
-		end)
+		s.MouseButton1Click:Connect(function() W:PlayClick(); if cfg.Callback then safe(cfg.Callback, c) end end)
 	end
 	local rBox = Instance.new("TextBox", holder)
-	rBox.Size = UDim2.new(0.32, 0, 0, 24)
+	rBox.Size = UDim2.new(0.3, 0, 0, 24)
 	rBox.Position = UDim2.new(0, 0, 0, 50)
 	rBox.BackgroundColor3 = Color3.fromRGB(22,8,8)
 	rBox.BorderSizePixel = 0
-	rBox.PlaceholderText = "R (0-255)"
+	rBox.PlaceholderText = "R"
 	rBox.PlaceholderColor3 = Color3.fromRGB(200,80,80)
 	rBox.Text = ""
 	rBox.TextColor3 = Color3.fromRGB(255,150,150)
@@ -1697,11 +2364,11 @@ function Tab:CreateColorPicker(cfg)
 	setFont(rBox, FONTS.Reg)
 	rBox.ZIndex = 6
 	Instance.new("UICorner", rBox).CornerRadius = UDim.new(0, 4)
-	local gBox = rBox:Clone(); gBox.Position = UDim2.new(0.34, 0, 0, 50); gBox.PlaceholderText = "G"; gBox.PlaceholderColor3 = Color3.fromRGB(80,200,80); gBox.TextColor3 = Color3.fromRGB(150,255,150); gBox.Parent = holder
-	local bBox = rBox:Clone(); bBox.Position = UDim2.new(0.68, 0, 0, 50); bBox.PlaceholderText = "B"; bBox.PlaceholderColor3 = Color3.fromRGB(80,80,200); bBox.TextColor3 = Color3.fromRGB(150,150,255); bBox.Parent = holder
+	local gBox = rBox:Clone(); gBox.Position = UDim2.new(0.32, 0, 0, 50); gBox.PlaceholderText = "G"; gBox.PlaceholderColor3 = Color3.fromRGB(80,200,80); gBox.TextColor3 = Color3.fromRGB(150,255,150); gBox.Parent = holder
+	local bBox = rBox:Clone(); bBox.Position = UDim2.new(0.64, 0, 0, 50); bBox.PlaceholderText = "B"; bBox.PlaceholderColor3 = Color3.fromRGB(80,80,200); bBox.TextColor3 = Color3.fromRGB(150,150,255); bBox.Parent = holder
 	local apply = Instance.new("TextButton", holder)
-	apply.Size = UDim2.new(0.3, 0, 0, 24)
-	apply.Position = UDim2.new(0.7, 0, 0, 50)
+	apply.Size = UDim2.new(0.32, 0, 0, 24)
+	apply.Position = UDim2.new(0.68, 0, 0, 50)
 	apply.BackgroundColor3 = W.Config.Accent
 	apply.BorderSizePixel = 0
 	apply.Text = "APPLY"
@@ -1711,12 +2378,11 @@ function Tab:CreateColorPicker(cfg)
 	apply.AutoButtonColor = false
 	apply.ZIndex = 6
 	Instance.new("UICorner", apply).CornerRadius = UDim.new(0, 4)
-	holder.Size = UDim2.new(1, 0, 0, 78)
 	apply.MouseButton1Click:Connect(function()
 		local r = tonumber(rBox.Text) or 0
 		local g = tonumber(gBox.Text) or 0
 		local b = tonumber(bBox.Text) or 0
-		r = clamp(r, 0, 255); g = clamp(g, 0, 255); b = clamp(b, 0, 255)
+		r = MU.clamp(r, 0, 255); g = MU.clamp(g, 0, 255); b = MU.clamp(b, 0, 255)
 		if cfg.Callback then safe(cfg.Callback, Color3.fromRGB(r, g, b)) end
 	end)
 	return holder
@@ -1754,7 +2420,7 @@ function Tab:CreateProgressBar(cfg)
 	fill.ZIndex = 7
 	Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
 	local function setVal(v)
-		v = clamp(v, 0, 1)
+		v = MU.clamp(v, 0, 1)
 		TweenService:Create(fill, E.QOut, {Size = UDim2.new(v, 0, 1, 0)}):Play()
 		lbl.Text = (cfg.Text or "Progress")..": "..math.floor(v*100).."%"
 	end
@@ -1779,14 +2445,10 @@ function Tab:CreatePlayerList(cfg)
 	local l = Instance.new("UIListLayout", scrolling)
 	l.Padding = UDim.new(0, 3)
 	local p = Instance.new("UIPadding", scrolling)
-	p.PaddingLeft = UDim.new(0, 3)
-	p.PaddingRight = UDim.new(0, 3)
-	p.PaddingTop = UDim.new(0, 3)
+	p.PaddingLeft = UDim.new(0, 3); p.PaddingRight = UDim.new(0, 3); p.PaddingTop = UDim.new(0, 3)
 	local selected = nil
 	local function update()
-		for _, c in ipairs(scrolling:GetChildren()) do
-			if c:IsA("TextButton") then c:Destroy() end
-		end
+		for _, c in ipairs(scrolling:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
 		for _, pl in ipairs(Players:GetPlayers()) do
 			if pl ~= lp then
 				local b = Instance.new("TextButton", scrolling)
@@ -1819,19 +2481,9 @@ function Tab:CreatePlayerList(cfg)
 	return scrolling, function() return selected end, update
 end
 
-function Tab:CreatePlayerDropdown(cfg)
-	cfg = cfg or {}
-	local W = self.Window
-	local holder, getSel = self:CreatePlayerList({Height = 120, Callback = cfg.Callback})
-	return holder, getSel
-end
-
 function Tab:CreateSearchBar(cfg)
 	cfg = cfg or {}
-	return self:CreateTextBox({
-		Placeholder = cfg.Placeholder or "Search...",
-		Callback = cfg.Callback,
-	})
+	return self:CreateTextBox({Placeholder = cfg.Placeholder or "Search...", Callback = cfg.Callback})
 end
 
 function Tab:CreateGroupBox(cfg)
@@ -1876,10 +2528,7 @@ function Tab:CreateImageButton(cfg)
 	b.LayoutOrder = self:GetNextOrder()
 	b.Parent = self.Content
 	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
-	b.MouseButton1Click:Connect(function()
-		W:PlayClick()
-		if cfg.Callback then safe(cfg.Callback) end
-	end)
+	b.MouseButton1Click:Connect(function() W:PlayClick(); if cfg.Callback then safe(cfg.Callback) end end)
 	return b
 end
 
@@ -1951,7 +2600,6 @@ function Tab:CreateRichText(cfg)
 end
 
 function Tab:CreateLineChart(cfg)
-	-- simple placeholder
 	local holder = Instance.new("Frame")
 	holder.Size = UDim2.new(1, 0, 0, cfg and cfg.Height or 60)
 	holder.BackgroundColor3 = Color3.fromRGB(18,8,8)
@@ -1963,15 +2611,20 @@ function Tab:CreateLineChart(cfg)
 	return holder
 end
 
--- Attach Tab functions to created tabs
+function Tab:CreateSeperator() return self:CreateDivider() end
+function Tab:CreateSmallButton(text, cb)
+	return self:CreateButton({Text = text, Height = 22, Callback = cb})
+end
+function Tab:CreateBigButton(text, cb)
+	return self:CreateButton({Text = text, Height = 36, Callback = cb})
+end
+
+-- Attach tab functions to created tabs
 local function attachTab(t)
-	for k, v in pairs(Tab) do
-		if k ~= "_newHolder" and k ~= "_styledButton" then t[k] = v end
-	end
+	for k, v in pairs(Tab) do t[k] = v end
 	return t
 end
 
--- Override CreateTab to attach methods
 local _oldCreateWindow = ToolxUI.CreateWindow
 function ToolxUI:CreateWindow(opt)
 	local W = _oldCreateWindow(self, opt)
@@ -1984,7 +2637,9 @@ function ToolxUI:CreateWindow(opt)
 	return W
 end
 
--- ============= KEY SYSTEM =============
+-- =========================================================================
+-- KEY SYSTEM
+-- =========================================================================
 function ToolxUI:BuildKeySystem(win, key, hint)
 	local W = win
 	local g = Instance.new("ScreenGui")
@@ -2012,10 +2667,10 @@ function ToolxUI:BuildKeySystem(win, key, hint)
 	local st = Instance.new("UIStroke", panel)
 	st.Thickness = 2
 	local stg = Instance.new("UIGradient", st)
-	stg.Color = ColorSequence.new(W.Config.Accent, brighten(W.Config.Accent, 70), W.Config.Accent)
+	stg.Color = ColorSequence.new(W.Config.Accent, CU.brighten(W.Config.Accent, 70), W.Config.Accent)
 	addSpin(stg, 0.8)
 	local bg = Instance.new("UIGradient", panel)
-	bg.Color = ColorSequence.new(darken(W.Config.Accent, 200), Color3.fromRGB(8,8,8), darken(W.Config.Accent, 200))
+	bg.Color = ColorSequence.new(CU.darken(W.Config.Accent, 200), Color3.fromRGB(8,8,8), CU.darken(W.Config.Accent, 200))
 	bg.Rotation = 45
 	addSpin(bg, 0.8)
 	local title = Instance.new("TextLabel", panel)
@@ -2108,7 +2763,9 @@ function ToolxUI:BuildKeySystem(win, key, hint)
 	return g
 end
 
--- ============= SETTINGS PANEL =============
+-- =========================================================================
+-- SETTINGS PANEL
+-- =========================================================================
 function ToolxUI:BuildSettingsPanel(W)
 	local panel = Instance.new("Frame", W.Gui)
 	panel.Size = UDim2.new(0, 260, 0, 340)
@@ -2121,10 +2778,10 @@ function ToolxUI:BuildSettingsPanel(W)
 	local st = Instance.new("UIStroke", panel)
 	st.Thickness = 2
 	local stg = Instance.new("UIGradient", st)
-	stg.Color = ColorSequence.new(W.Config.Accent, brighten(W.Config.Accent, 70), W.Config.Accent)
+	stg.Color = ColorSequence.new(W.Config.Accent, CU.brighten(W.Config.Accent, 70), W.Config.Accent)
 	addSpin(stg, 0.8)
 	local bg = Instance.new("UIGradient", panel)
-	bg.Color = ColorSequence.new(darken(W.Config.Accent, 200), Color3.fromRGB(8,8,8), darken(W.Config.Accent, 200))
+	bg.Color = ColorSequence.new(CU.darken(W.Config.Accent, 200), Color3.fromRGB(8,8,8), CU.darken(W.Config.Accent, 200))
 	bg.Rotation = 45
 	addSpin(bg, 0.8)
 	local t = Instance.new("TextLabel", panel)
@@ -2158,7 +2815,7 @@ function ToolxUI:BuildSettingsPanel(W)
 		panel.Position = W.Main.Position
 		panel.Visible = true
 		W:FrameParticles(panel, "in", 45, 90)
-		W:Shockwave(W.GearBtn, 30, W.Config.Accent, darken(W.Config.Accent, 120), 0.7)
+		W:Shockwave(W.GearBtn, 30, W.Config.Accent, CU.darken(W.Config.Accent, 120), 0.7)
 		W:ShakeFrame(panel, 5, 0.25)
 	end)
 	back.MouseButton1Click:Connect(function()
@@ -2168,7 +2825,7 @@ function ToolxUI:BuildSettingsPanel(W)
 		TweenService:Create(back, E.QIO, {Rotation = -360}):Play()
 		W:FrameParticles(panel, "out", 45, 90)
 		W:ShakeFrame(panel, 6, 0.25)
-		W:Shockwave(back, 25, W.Config.Accent, darken(W.Config.Accent, 120), 0.65)
+		W:Shockwave(back, 25, W.Config.Accent, CU.darken(W.Config.Accent, 120), 0.65)
 		task.wait(0.35)
 		panel.Visible = false
 		W.Main.Visible = true
@@ -2177,7 +2834,6 @@ function ToolxUI:BuildSettingsPanel(W)
 		W:FrameParticles(W.Main, "in", 25, 60)
 		settingsOpen = false
 	end)
-	-- effects toggles
 	local scroll = Instance.new("ScrollingFrame", panel)
 	scroll.Size = UDim2.new(1, -12, 1, -40)
 	scroll.Position = UDim2.new(0, 6, 0, 34)
@@ -2200,7 +2856,6 @@ function ToolxUI:BuildSettingsPanel(W)
 		b.TextSize = 12
 		setFont(b, FONTS.Bold)
 		b.AutoButtonColor = false
-		b.LayoutOrder = #keys
 		Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
 		b.MouseButton1Click:Connect(function()
 			W:PlayClick()
@@ -2210,7 +2865,6 @@ function ToolxUI:BuildSettingsPanel(W)
 			b.Text = k..": "..(on and "ON" or "OFF")
 		end)
 	end
-	-- themes
 	local themeLbl = Instance.new("TextLabel", scroll)
 	themeLbl.Size = UDim2.new(1, -6, 0, 20)
 	themeLbl.BackgroundTransparency = 1
@@ -2219,24 +2873,23 @@ function ToolxUI:BuildSettingsPanel(W)
 	themeLbl.TextSize = 12
 	setFont(themeLbl, FONTS.Title)
 	themeLbl.TextXAlignment = Enum.TextXAlignment.Left
-	local themes = {"Dark", "Light", "Neon", "Void", "Blood", "Ocean"}
-	local themeRow = Instance.new("Frame", scroll)
-	themeRow.Size = UDim2.new(1, -6, 0, 40)
-	themeRow.BackgroundTransparency = 1
-	local rowLay = Instance.new("UIListLayout", themeRow)
+	local themeHolder = Instance.new("Frame", scroll)
+	themeHolder.Size = UDim2.new(1, -6, 0, 80)
+	themeHolder.BackgroundTransparency = 1
+	local rowLay = Instance.new("UIListLayout", themeHolder)
 	rowLay.FillDirection = Enum.FillDirection.Horizontal
 	rowLay.Padding = UDim.new(0, 3)
-	for i, name in ipairs(themes) do
-		local tb = Instance.new("TextButton", themeRow)
-		tb.Size = UDim2.new(0, 60, 0, 24)
-		tb.BackgroundColor3 = THEMES[name].Accent
+	rowLay.Wraps = true
+	for name, data in pairs(THEMES) do
+		local tb = Instance.new("TextButton", themeHolder)
+		tb.Size = UDim2.new(0, 62, 0, 22)
+		tb.BackgroundColor3 = data.Accent
 		tb.BorderSizePixel = 0
 		tb.Text = name
 		tb.TextColor3 = Color3.new(1,1,1)
 		tb.TextSize = 10
 		setFont(tb, FONTS.Bold)
 		tb.AutoButtonColor = false
-		tb.LayoutOrder = i
 		Instance.new("UICorner", tb).CornerRadius = UDim.new(0, 4)
 		tb.MouseButton1Click:Connect(function()
 			W:PlayClick()
@@ -2246,10 +2899,26 @@ function ToolxUI:BuildSettingsPanel(W)
 	W.SettingsPanel = panel
 end
 
--- ============= EXPOSE PLAYER UTILS =============
-ToolxUI.PlayerUtils = PU
-ToolxUI.Themes = THEMES
-ToolxUI.Fonts = FONTS
-ToolxUI.Icons = ICONS
+-- =========================================================================
+-- EXTRA API
+-- =========================================================================
+function ToolxUI:GetVersion() return self._version end
+function ToolxUI:GetThemes() return TU.keys(THEMES) end
+function ToolxUI:GetTheme(name) return THEMES[name] end
+function ToolxUI:RegisterTheme(name, data) THEMES[name] = data end
+function ToolxUI:GetPlayerUtils() return PU end
+function ToolxUI:GetCharacterUtils() return CHU end
+function ToolxUI:GetCameraUtils() return CAM end
+function ToolxUI:GetRayUtils() return RU end
+function ToolxUI:GetColorUtils() return CU end
+function ToolxUI:GetMathUtils() return MU end
+function ToolxUI:GetTableUtils() return TU end
+function ToolxUI:GetStringUtils() return SU end
+function ToolxUI:GetInstanceUtils() return IU end
+function ToolxUI:GetFileUtils() return FU end
+function ToolxUI:GetSoundUtils() return SB end
+function ToolxUI:GetTimeUtils() return NU end
+function ToolxUI:IsAlive(plr) return isAlive(plr) end
+function ToolxUI:GetLocalPlayer() return lp end
 
 return ToolxUI
