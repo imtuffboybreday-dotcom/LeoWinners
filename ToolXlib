@@ -1,0 +1,2053 @@
+--[[
+	ToolxUI Library v1.0
+	By LeoV1 And Rex
+	Full Featured UI Library - 70+ Features
+	Usage:
+		local UI = loadstring(game:HttpGet("..."))()
+		local Window = UI:CreateWindow({Title = "Tools.x", Accent = Color3.fromRGB(220,20,20)})
+]]
+
+local ToolxUI = {}
+ToolxUI.__index = ToolxUI
+
+-- ================== SERVICES ==================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UIS = game:GetService("UserInputService")
+local SoundService = game:GetService("SoundService")
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+local lp = Players.LocalPlayer
+
+-- ================== SAFE GUARD ==================
+local function safe(fn, ...)
+	local ok, res = pcall(fn, ...)
+	if not ok then warn("[ToolxUI] "..tostring(res)) end
+	return ok, res
+end
+
+-- ================== FONT HELPERS ==================
+local function tryFont(n, w)
+	local f
+	pcall(function() f = Font.fromName(n, w or Enum.FontWeight.Regular) end)
+	return f
+end
+local FONTS = {
+	Title = tryFont("Zekton", Enum.FontWeight.Bold) or Enum.Font.GothamBlack,
+	Bold  = tryFont("Zekton", Enum.FontWeight.SemiBold) or Enum.Font.GothamBold,
+	Body  = tryFont("Oswald", Enum.FontWeight.Medium) or Enum.Font.GothamSemibold,
+	Reg   = tryFont("Roboto", Enum.FontWeight.Regular) or Enum.Font.Gotham,
+}
+ToolxUI.Fonts = FONTS
+
+local function setFont(o, f)
+	if not o or not f then return end
+	if typeof(f) == "EnumItem" then safe(function() o.Font = f end)
+	else safe(function() o.FontFace = f end) end
+end
+
+-- ================== ICONS ==================
+local ICONS = {
+	Min = "rbxassetid://6031090990",
+	Max = "rbxassetid://6031094667",
+	Back = "rbxassetid://6031091004",
+	Gear = "rbxassetid://6031280882",
+	Close = "rbxassetid://6031094678",
+	Check = "rbxassetid://6031091004",
+	Arrow = "rbxassetid://6031090990",
+}
+ToolxUI.Icons = ICONS
+
+-- ================== SOUNDS ==================
+local CLICK_ID = "rbxassetid://6895079853"
+local HOVER_ID = "rbxassetid://6895079853"
+
+-- ================== THEMES ==================
+ToolxUI.Themes = {
+	Dark = {
+		Bg = Color3.fromRGB(10,10,10),
+		Panel = Color3.fromRGB(18,8,8),
+		Text = Color3.fromRGB(255,220,220),
+		SubText = Color3.fromRGB(150,90,90),
+		Accent = Color3.fromRGB(220,20,20),
+		Good = Color3.fromRGB(30,110,40),
+		Info = Color3.fromRGB(40,80,160),
+		Warn = Color3.fromRGB(180,120,20),
+		Danger = Color3.fromRGB(170,20,20),
+	},
+	Light = {
+		Bg = Color3.fromRGB(240,240,240),
+		Panel = Color3.fromRGB(220,220,220),
+		Text = Color3.fromRGB(30,30,30),
+		SubText = Color3.fromRGB(100,100,100),
+		Accent = Color3.fromRGB(220,20,20),
+		Good = Color3.fromRGB(30,160,60),
+		Info = Color3.fromRGB(50,110,200),
+		Warn = Color3.fromRGB(200,140,20),
+		Danger = Color3.fromRGB(200,30,30),
+	},
+	Neon = {
+		Bg = Color3.fromRGB(5,5,15),
+		Panel = Color3.fromRGB(10,5,25),
+		Text = Color3.fromRGB(200,240,255),
+		SubText = Color3.fromRGB(120,180,220),
+		Accent = Color3.fromRGB(0,255,200),
+		Good = Color3.fromRGB(30,220,110),
+		Info = Color3.fromRGB(50,150,255),
+		Warn = Color3.fromRGB(255,180,30),
+		Danger = Color3.fromRGB(255,60,100),
+	},
+	Void = {
+		Bg = Color3.fromRGB(8,0,20),
+		Panel = Color3.fromRGB(15,5,30),
+		Text = Color3.fromRGB(230,200,255),
+		SubText = Color3.fromRGB(150,100,200),
+		Accent = Color3.fromRGB(180,40,255),
+		Good = Color3.fromRGB(120,60,220),
+		Info = Color3.fromRGB(80,80,255),
+		Warn = Color3.fromRGB(255,120,60),
+		Danger = Color3.fromRGB(220,30,90),
+	},
+}
+
+-- ================== SHINE SYSTEM ==================
+local shineList = {}
+local function addShine(g, spd)
+	if not g then return end
+	table.insert(shineList, {grad = g, speed = spd or 0.015, dir = 1})
+	safe(function() g.Offset = Vector2.new(-1, 0) end)
+end
+RunService.RenderStepped:Connect(function(dt)
+	local step = dt * 60
+	for _, s in ipairs(shineList) do
+		if s.grad and s.grad.Parent then
+			local nx = s.grad.Offset.X + s.speed * step * s.dir
+			if nx > 1 then s.dir = -1; nx = 1
+			elseif nx < -1 then s.dir = 1; nx = -1 end
+			s.grad.Offset = Vector2.new(nx, 0)
+		end
+	end
+end)
+
+-- ================== SPIN SYSTEM ==================
+local spinList = {}
+local function addSpin(obj, speed, axis)
+	axis = axis or "Z"
+	table.insert(spinList, {obj = obj, speed = speed or 1, axis = axis})
+end
+RunService.RenderStepped:Connect(function(dt)
+	for _, s in ipairs(spinList) do
+		if s.obj and s.obj.Parent then
+			if s.axis == "Z" then
+				s.obj.Rotation = (s.obj.Rotation + s.speed * dt * 60) % 360
+			elseif s.axis == "Grad" then
+				s.obj.Rotation = (s.obj.Rotation + s.speed * dt * 60) % 360
+			end
+		end
+	end
+end)
+
+-- ================== EASING SHORTCUTS ==================
+local Ease = {
+	QuintOut = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+	QuintInOut = TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.InOut),
+	BackOut = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+	SineInOut = TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+	Linear = TweenInfo.new(0.2, Enum.EasingStyle.Linear),
+}
+
+-- ================== UTIL ==================
+local function brighten(c, add)
+	return Color3.fromRGB(
+		math.min(c.R*255+add, 255),
+		math.min(c.G*255+add, 255),
+		math.min(c.B*255+add, 255)
+	)
+end
+local function darken(c, sub)
+	return Color3.fromRGB(
+		math.max(c.R*255-sub, 0),
+		math.max(c.G*255-sub, 0),
+		math.max(c.B*255-sub, 0)
+	)
+end
+local function lerpColor(a, b, t)
+	return Color3.new(a.R + (b.R-a.R)*t, a.G + (b.G-a.G)*t, a.B + (b.B-a.B)*t)
+end
+
+-- ================== EFFECTS ==================
+local function createFxGui()
+	local g = Instance.new("ScreenGui")
+	g.Name = "ToolxUI_FX"
+	g.ResetOnSpawn = false
+	g.IgnoreGuiInset = true
+	g.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	g.DisplayOrder = 998
+	g.Parent = (safe(function() return gethui() end) and gethui()) or CoreGui
+	return g
+end
+
+-- ================== TOOLXUI CLASS ==================
+function ToolxUI.new(opt)
+	local self = setmetatable({}, ToolxUI)
+	opt = opt or {}
+	
+	self.Config = {
+		Title = opt.Title or "ToolxUI",
+		Subtitle = opt.Subtitle or "",
+		Width = opt.Width or 260,
+		Height = opt.Height or 340,
+		Accent = opt.Accent or Color3.fromRGB(220,20,20),
+		Theme = opt.Theme or "Dark",
+		Key = opt.Key,
+		KeyHint = opt.KeyHint or "",
+		Draggable = opt.Draggable ~= false,
+		Resizable = opt.Resizable ~= false,
+		MinWidth = 180, MaxWidth = 600,
+		MinHeight = 160, MaxHeight = 700,
+		Effects = {Sound = true, Particles = true, Shockwave = true, Fire = true, Shine = true, Spin = true},
+		Language = opt.Language or "en",
+		AutoSave = opt.AutoSave or false,
+		ConfigFolder = opt.ConfigFolder or "ToolxUI_Configs",
+		Debug = opt.Debug or false,
+	}
+	self.Theme = ToolxUI.Themes[self.Config.Theme] or ToolxUI.Themes.Dark
+	self.Tabs = {}
+	self.Elements = {}
+	self.Connections = {}
+	self.Notifications = {}
+	self.Keybinds = {}
+	self.Flags = {}
+	self.FxGui = createFxGui()
+	self.SoundBank = {}
+	
+	if opt.Parent then self.Parent = opt.Parent
+	else self.Parent = (safe(function() return gethui() end) and gethui()) or CoreGui end
+	
+	if self.Config.Debug then print("[ToolxUI] Initialized:", self.Config.Title) end
+	
+	self:_buildSounds()
+	self:_buildRoot()
+	self:_buildNotifier()
+	self:_buildTooltipLayer()
+	if self.Config.Key then self:_buildKeySystem() end
+	
+	return self
+end
+
+-- ================== SOUNDS ==================
+function ToolxUI:_buildSounds()
+	self.SoundBank.Click = Instance.new("Sound")
+	self.SoundBank.Click.SoundId = CLICK_ID
+	self.SoundBank.Click.Volume = 0.45
+	self.SoundBank.Click.Parent = self.FxGui
+	
+	self.SoundBank.Hover = Instance.new("Sound")
+	self.SoundBank.Hover.SoundId = HOVER_ID
+	self.SoundBank.Hover.Volume = 0.15
+	self.SoundBank.Hover.PlaybackSpeed = 1.4
+	self.SoundBank.Hover.Parent = self.FxGui
+	
+	self.SoundBank.Error = Instance.new("Sound")
+	self.SoundBank.Error.SoundId = CLICK_ID
+	self.SoundBank.Error.Volume = 0.35
+	self.SoundBank.Error.PlaybackSpeed = 0.7
+	self.SoundBank.Error.Parent = self.FxGui
+end
+
+function ToolxUI:PlayClick(pitch)
+	if not self.Config.Effects.Sound then return end
+	local s = self.SoundBank.Click:Clone()
+	s.Pitch = pitch or 1
+	s.Parent = SoundService
+	s:Play()
+	task.delay(1, function() s:Destroy() end)
+end
+function ToolxUI:PlayHover()
+	if not self.Config.Effects.Sound then return end
+	local s = self.SoundBank.Hover:Clone()
+	s.Parent = SoundService
+	s:Play()
+	task.delay(1, function() s:Destroy() end)
+end
+function ToolxUI:PlayError()
+	if not self.Config.Effects.Sound then return end
+	local s = self.SoundBank.Error:Clone()
+	s.Parent = SoundService
+	s:Play()
+	task.delay(1, function() s:Destroy() end)
+end
+
+-- ================== EFFECTS (Particles/Shockwave/etc) ==================
+function ToolxUI:BurstAt(x, y, cA, cB, count, dist)
+	if not self.Config.Effects.Particles then return end
+	count = count or 8
+	dist = dist or 25
+	cA = cA or self.Config.Accent
+	cB = cB or darken(self.Config.Accent, 120)
+	for _ = 1, count do
+		task.spawn(function()
+			local p = Instance.new("Frame")
+			p.AnchorPoint = Vector2.new(0.5, 0.5)
+			p.Position = UDim2.new(0, x, 0, y)
+			p.Size = UDim2.new(0, 6, 0, 6)
+			p.BackgroundColor3 = Color3.fromRGB(255,255,255)
+			p.BorderSizePixel = 0
+			p.ZIndex = 90
+			p.Parent = self.FxGui
+			Instance.new("UICorner", p).CornerRadius = UDim.new(1, 0)
+			local g = Instance.new("UIGradient", p)
+			g.Color = ColorSequence.new{
+				ColorSequenceKeypoint.new(0, cA),
+				ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255,255,255)),
+				ColorSequenceKeypoint.new(1, cB)
+			}
+			g.Rotation = 45
+			addShine(g, 0.09)
+			local ang = math.random() * math.pi * 2
+			local d = dist * 0.6 + math.random() * dist
+			TweenService:Create(p, TweenInfo.new(0.55, Enum.EasingStyle.Quint), {
+				Position = UDim2.new(0, x + math.cos(ang)*d, 0, y + math.sin(ang)*d),
+				Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1
+			}):Play()
+			task.wait(0.6)
+			p:Destroy()
+		end)
+	end
+end
+
+function ToolxUI:Shockwave(originFrame, size, cA, cB, dur)
+	if not self.Config.Effects.Shockwave then return end
+	dur = dur or 0.7
+	cA = cA or self.Config.Accent
+	cB = cB or darken(self.Config.Accent, 120)
+	local function makeRing(delay2, scaleMult, thick)
+		task.delay(delay2, function()
+			local ring = Instance.new("Frame")
+			ring.AnchorPoint = Vector2.new(0.5, 0.5)
+			ring.Position = UDim2.new(0,
+				originFrame.AbsolutePosition.X + originFrame.AbsoluteSize.X/2 - self.FxGui.AbsolutePosition.X, 0,
+				originFrame.AbsolutePosition.Y + originFrame.AbsoluteSize.Y/2 - self.FxGui.AbsolutePosition.Y)
+			ring.Size = UDim2.new(0, size, 0, size)
+			ring.BackgroundColor3 = Color3.fromRGB(255,255,255)
+			ring.BackgroundTransparency = 0.15
+			ring.BorderSizePixel = 0
+			ring.ZIndex = 20
+			ring.Parent = self.FxGui
+			Instance.new("UICorner", ring).CornerRadius = UDim.new(1, 0)
+			local grad = Instance.new("UIGradient", ring)
+			grad.Color = ColorSequence.new{
+				ColorSequenceKeypoint.new(0, cA),
+				ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255,255,255)),
+				ColorSequenceKeypoint.new(1, cB)
+			}
+			grad.Rotation = 45
+			addShine(grad, 0.06)
+			local stroke = Instance.new("UIStroke", ring)
+			stroke.Color = cA
+			stroke.Thickness = thick or 3
+			local sg2 = Instance.new("UIGradient", stroke)
+			sg2.Color = grad.Color
+			sg2.Rotation = 45
+			addShine(sg2, 0.06)
+			TweenService:Create(ring, TweenInfo.new(dur, Enum.EasingStyle.Quint), {
+				Size = UDim2.new(0, size*scaleMult, 0, size*scaleMult),
+				BackgroundTransparency = 1
+			}):Play()
+			TweenService:Create(stroke, TweenInfo.new(dur, Enum.EasingStyle.Quint), {
+				Transparency = 1, Thickness = 0
+			}):Play()
+			task.delay(dur + 0.05, function() ring:Destroy() end)
+		end)
+	end
+	makeRing(0, 3, 3)
+	makeRing(0.06, 4, 2)
+	makeRing(0.12, 5, 1.5)
+end
+
+function ToolxUI:ShakeFrame(frame, intensity, dur)
+	intensity = intensity or 6
+	dur = dur or 0.25
+	local bp = frame.Position
+	local t0 = tick()
+	task.spawn(function()
+		while tick() - t0 < dur do
+			frame.Position = UDim2.new(bp.X.Scale, bp.X.Offset + (math.random()-0.5)*2*intensity,
+				bp.Y.Scale, bp.Y.Offset + (math.random()-0.5)*2*intensity)
+			task.wait(0.02)
+		end
+		frame.Position = bp
+	end)
+end
+
+function ToolxUI:FireFlames(frame, duration)
+	if not self.Config.Effects.Fire then return end
+	local t0 = tick()
+	task.spawn(function()
+		while tick() - t0 < duration do
+			if not frame.Parent then break end
+			local p = Instance.new("Frame")
+			p.AnchorPoint = Vector2.new(0.5, 0.5)
+			local px = frame.AbsolutePosition.X - self.FxGui.AbsolutePosition.X + math.random() * frame.AbsoluteSize.X
+			local py = frame.AbsolutePosition.Y - self.FxGui.AbsolutePosition.Y + frame.AbsoluteSize.Y - 3
+			p.Position = UDim2.new(0, px, 0, py)
+			local sz = 6 + math.random() * 10
+			p.Size = UDim2.new(0, sz, 0, sz)
+			local cols = {Color3.fromRGB(255,80,20), Color3.fromRGB(255,140,30), Color3.fromRGB(255,220,80), Color3.fromRGB(255,255,180)}
+			local c = cols[math.random(1, #cols)]
+			p.BackgroundColor3 = c
+			p.BorderSizePixel = 0
+			p.ZIndex = 100
+			p.Parent = self.FxGui
+			Instance.new("UICorner", p).CornerRadius = UDim.new(1, 0)
+			local g = Instance.new("UIGradient", p)
+			g.Color = ColorSequence.new{
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 220)),
+				ColorSequenceKeypoint.new(0.45, c),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 10, 0))
+			}
+			g.Rotation = 90
+			local rise = 35 + math.random() * 65
+			local drift = (math.random() - 0.5) * 30
+			TweenService:Create(p, TweenInfo.new(0.6 + math.random()*0.5, Enum.EasingStyle.Quad), {
+				Position = UDim2.new(0, px + drift, 0, py - rise),
+				Size = UDim2.new(0, sz*0.2, 0, sz*0.2), BackgroundTransparency = 1
+			}):Play()
+			task.delay(1.3, function() p:Destroy() end)
+			task.wait(0.01)
+		end
+	end)
+end
+
+function ToolxUI:FrameParticles(frame, mode, count, dist)
+	if not self.Config.Effects.Particles then return end
+	count = count or 30
+	dist = dist or 70
+	local cols = {Color3.fromRGB(255,60,60), Color3.fromRGB(255,110,50), Color3.fromRGB(220,20,20), Color3.fromRGB(255,200,80)}
+	for _ = 1, count do
+		task.spawn(function()
+			local p = Instance.new("Frame")
+			p.AnchorPoint = Vector2.new(0.5, 0.5)
+			local px = frame.AbsolutePosition.X - self.FxGui.AbsolutePosition.X + math.random() * frame.AbsoluteSize.X
+			local py = frame.AbsolutePosition.Y - self.FxGui.AbsolutePosition.Y + math.random() * frame.AbsoluteSize.Y
+			local c = cols[math.random(1, #cols)]
+			local ang = math.random() * math.pi * 2
+			local d = dist * 0.5 + math.random() * dist
+			if mode == "out" then p.Position = UDim2.new(0, px, 0, py)
+			else p.Position = UDim2.new(0, px + math.cos(ang) * d, 0, py + math.sin(ang) * d) end
+			local sz = 4 + math.random() * 7
+			p.Size = UDim2.new(0, sz, 0, sz)
+			p.BackgroundColor3 = c
+			p.BorderSizePixel = 0
+			p.ZIndex = 95
+			p.Parent = self.FxGui
+			Instance.new("UICorner", p).CornerRadius = UDim.new(1, 0)
+			if mode == "out" then
+				local ea = math.random() * math.pi * 2
+				TweenService:Create(p, TweenInfo.new(0.7, Enum.EasingStyle.Quint), {
+					Position = UDim2.new(0, px + math.cos(ea) * d, 0, py + math.sin(ea) * d),
+					Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1
+				}):Play()
+			else
+				local tx = frame.AbsolutePosition.X - self.FxGui.AbsolutePosition.X + frame.AbsoluteSize.X/2
+				local ty = frame.AbsolutePosition.Y - self.FxGui.AbsolutePosition.Y + frame.AbsoluteSize.Y/2
+				TweenService:Create(p, TweenInfo.new(0.7, Enum.EasingStyle.Quint), {
+					Position = UDim2.new(0, tx, 0, ty), Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1
+				}):Play()
+			end
+			task.delay(0.85, function() p:Destroy() end)
+		end)
+		task.wait(0.008)
+	end
+end
+
+-- ================== NOTIFIER ==================
+function ToolxUI:_buildNotifier()
+	local g = Instance.new("ScreenGui")
+	g.Name = "ToolxUI_Notif"
+	g.ResetOnSpawn = false
+	g.IgnoreGuiInset = true
+	g.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	g.DisplayOrder = 1000
+	g.Parent = self.Parent
+	self.NotifGui = g
+	
+	local holder = Instance.new("Frame")
+	holder.Size = UDim2.new(0, 300, 0, 300)
+	holder.Position = UDim2.new(1, -320, 0, 20)
+	holder.BackgroundTransparency = 1
+	holder.Parent = g
+	local l = Instance.new("UIListLayout", holder)
+	l.Padding = UDim.new(0, 6)
+	l.SortOrder = Enum.SortOrder.LayoutOrder
+	l.HorizontalAlignment = Enum.HorizontalAlignment.Right
+	self.NotifHolder = holder
+end
+
+function ToolxUI:Notify(text, color, duration)
+	color = color or self.Config.Accent
+	duration = duration or 3
+	local holder = Instance.new("Frame")
+	holder.Size = UDim2.new(0, 260, 0, 40)
+	holder.BackgroundTransparency = 1
+	holder.Parent = self.NotifHolder
+	
+	local shadow = Instance.new("Frame", holder)
+	shadow.Size = UDim2.new(1, 8, 1, 8)
+	shadow.Position = UDim2.new(0, -4, 0, 3)
+	shadow.BackgroundColor3 = Color3.fromRGB(255,255,255)
+	shadow.BorderSizePixel = 0
+	shadow.BackgroundTransparency = 1
+	Instance.new("UICorner", shadow).CornerRadius = UDim.new(0, 2)
+	local shGrad = Instance.new("UIGradient", shadow)
+	shGrad.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
+		ColorSequenceKeypoint.new(0.5, color),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0))
+	}
+	shGrad.Transparency = NumberSequence.new{
+		NumberSequenceKeypoint.new(0, 0.25),
+		NumberSequenceKeypoint.new(0.5, 0),
+		NumberSequenceKeypoint.new(1, 0.25)
+	}
+	shGrad.Rotation = 90
+	
+	local f = Instance.new("Frame", holder)
+	f.Size = UDim2.new(1, 0, 1, 0)
+	f.BackgroundColor3 = Color3.fromRGB(12,12,12)
+	f.BorderSizePixel = 0
+	f.BackgroundTransparency = 1
+	Instance.new("UICorner", f).CornerRadius = UDim.new(0, 2)
+	local grad = Instance.new("UIGradient", f)
+	grad.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(30,6,6)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(8,8,8)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(30,6,6))
+	}
+	grad.Rotation = 45
+	
+	local stroke = Instance.new("UIStroke", f)
+	stroke.Color = color
+	stroke.Thickness = 1.5
+	stroke.Transparency = 1
+	
+	local lbl = Instance.new("TextLabel", f)
+	lbl.Size = UDim2.new(1, -10, 1, 0)
+	lbl.Position = UDim2.new(0, 5, 0, 0)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = text
+	lbl.TextColor3 = color
+	lbl.TextSize = 14
+	setFont(lbl, FONTS.Bold)
+	lbl.TextTransparency = 1
+	lbl.TextXAlignment = Enum.TextXAlignment.Center
+	
+	task.spawn(function()
+		for _ = 1, duration * 30 do
+			if not holder.Parent then break end
+			shGrad.Rotation = (shGrad.Rotation + 4) % 360
+			task.wait(0.033)
+		end
+	end)
+	
+	TweenService:Create(f, Ease.QuintOut, {BackgroundTransparency = 0.08}):Play()
+	TweenService:Create(shadow, TweenInfo.new(0.25), {BackgroundTransparency = 0.3}):Play()
+	TweenService:Create(stroke, TweenInfo.new(0.25), {Transparency = 0}):Play()
+	TweenService:Create(lbl, TweenInfo.new(0.25), {TextTransparency = 0}):Play()
+	
+	task.delay(duration, function()
+		TweenService:Create(f, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+		TweenService:Create(shadow, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+		TweenService:Create(stroke, TweenInfo.new(0.3), {Transparency = 1}):Play()
+		TweenService:Create(lbl, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+		task.wait(0.35)
+		holder:Destroy()
+	end)
+end
+
+-- ================== TOOLTIP LAYER ==================
+function ToolxUI:_buildTooltipLayer()
+	local g = Instance.new("ScreenGui")
+	g.Name = "ToolxUI_Tooltip"
+	g.ResetOnSpawn = false
+	g.IgnoreGuiInset = true
+	g.DisplayOrder = 1002
+	g.Parent = self.Parent
+	self.TooltipGui = g
+end
+
+function ToolxUI:AttachTooltip(obj, text)
+	local tipGui = self.TooltipGui
+	local tip = Instance.new("Frame")
+	tip.BackgroundColor3 = Color3.fromRGB(15,5,5)
+	tip.BorderSizePixel = 0
+	tip.Size = UDim2.new(0, 0, 0, 22)
+	tip.Visible = false
+	tip.ZIndex = 100
+	tip.Parent = tipGui
+	Instance.new("UICorner", tip).CornerRadius = UDim.new(0, 4)
+	local st = Instance.new("UIStroke", tip)
+	st.Color = self.Config.Accent
+	st.Thickness = 1.2
+	local lbl = Instance.new("TextLabel", tip)
+	lbl.Size = UDim2.new(1, -10, 1, 0)
+	lbl.Position = UDim2.new(0, 5, 0, 0)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = text
+	lbl.TextColor3 = self.Theme.Text
+	lbl.TextSize = 12
+	setFont(lbl, FONTS.Body)
+	
+	obj.MouseEnter:Connect(function()
+		tip.Position = UDim2.new(0, obj.AbsolutePosition.X, 0, obj.AbsolutePosition.Y - 28)
+		tip.Size = UDim2.new(0, lbl.TextBounds.X + 20, 0, 22)
+		tip.Visible = true
+		tip.BackgroundTransparency = 1
+		lbl.TextTransparency = 1
+		TweenService:Create(tip, Ease.SineInOut, {BackgroundTransparency = 0}):Play()
+		TweenService:Create(lbl, Ease.SineInOut, {TextTransparency = 0}):Play()
+	end)
+	obj.MouseLeave:Connect(function()
+		TweenService:Create(tip, Ease.SineInOut, {BackgroundTransparency = 1}):Play()
+		TweenService:Create(lbl, Ease.SineInOut, {TextTransparency = 1}):Play()
+		task.wait(0.25)
+		tip.Visible = false
+	end)
+end
+
+-- ================== ROOT BUILD ==================
+function ToolxUI:_buildRoot()
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "ToolxUI"
+	gui.ResetOnSpawn = false
+	gui.IgnoreGuiInset = true
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui.DisplayOrder = 999
+	gui.Parent = self.Parent
+	self.Gui = gui
+	
+	-- Toggle button
+	local tog = Instance.new("TextButton")
+	tog.Size = UDim2.new(0, 42, 0, 42)
+	tog.Position = UDim2.new(0, 12, 0.5, -21)
+	tog.BackgroundColor3 = Color3.fromRGB(12,5,5)
+	tog.BorderSizePixel = 0
+	tog.Text = "≡"
+	tog.TextColor3 = self.Config.Accent
+	tog.TextSize = 22
+	setFont(tog, FONTS.Title)
+	tog.AutoButtonColor = false
+	tog.ZIndex = 5
+	tog.Parent = gui
+	Instance.new("UICorner", tog).CornerRadius = UDim.new(0, 6)
+	
+	local tShine = Instance.new("Frame", tog)
+	tShine.Size = UDim2.new(1,0,1,0)
+	tShine.BackgroundColor3 = Color3.fromRGB(255,255,255)
+	tShine.BackgroundTransparency = 0.85
+	tShine.BorderSizePixel = 0
+	tShine.ZIndex = 6
+	Instance.new("UICorner", tShine).CornerRadius = UDim.new(0, 6)
+	local tSG = Instance.new("UIGradient", tShine)
+	tSG.Transparency = NumberSequence.new{
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.42, 1),
+		NumberSequenceKeypoint.new(0.5, 0.25),
+		NumberSequenceKeypoint.new(0.58, 1),
+		NumberSequenceKeypoint.new(1, 1)
+	}
+	tSG.Rotation = 30
+	addShine(tSG, 0.02)
+	
+	local ts = Instance.new("UIStroke", tog)
+	ts.Color = self.Config.Accent
+	ts.Thickness = 1.5
+	local tsg = Instance.new("UIGradient", ts)
+	tsg.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, self.Config.Accent),
+		ColorSequenceKeypoint.new(0.5, darken(self.Config.Accent, 100)),
+		ColorSequenceKeypoint.new(1, self.Config.Accent)
+	}
+	addSpin(tsg, 1, "Grad")
+	self.ToggleBtn = tog
+	self.ToggleStroke = tsg
+	
+	-- Main window
+	local main = Instance.new("Frame")
+	main.Size = UDim2.new(0, self.Config.Width, 0, self.Config.Height)
+	main.Position = UDim2.new(0.5, -self.Config.Width/2, 0.5, -self.Config.Height/2)
+	main.BackgroundColor3 = Color3.fromRGB(10,10,10)
+	main.BorderSizePixel = 0
+	main.ClipsDescendants = true
+	main.Visible = false
+	main.Parent = gui
+	Instance.new("UICorner", main).CornerRadius = UDim.new(0, 4)
+	self.Main = main
+	
+	local shine = Instance.new("Frame", main)
+	shine.Size = UDim2.new(1,0,1,0)
+	shine.BackgroundColor3 = Color3.fromRGB(255,255,255)
+	shine.BackgroundTransparency = 0.85
+	shine.BorderSizePixel = 0
+	shine.ZIndex = 1
+	Instance.new("UICorner", shine).CornerRadius = UDim.new(0, 4)
+	local shG = Instance.new("UIGradient", shine)
+	shG.Color = ColorSequence.new(Color3.fromRGB(255,255,255), Color3.fromRGB(255,255,255))
+	shG.Transparency = NumberSequence.new{
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.42, 1),
+		NumberSequenceKeypoint.new(0.5, 0.2),
+		NumberSequenceKeypoint.new(0.58, 1),
+		NumberSequenceKeypoint.new(1, 1)
+	}
+	shG.Rotation = 30
+	addShine(shG, 0.012)
+	
+	local st = Instance.new("UIStroke", main)
+	st.Thickness = 2
+	st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	self.Stroke = st
+	local stG = Instance.new("UIGradient", st)
+	stG.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, self.Config.Accent),
+		ColorSequenceKeypoint.new(0.5, brighten(self.Config.Accent, 70)),
+		ColorSequenceKeypoint.new(1, self.Config.Accent)
+	}
+	self.StrokeGrad = stG
+	addSpin(stG, 1.2, "Grad")
+	
+	local bg = Instance.new("UIGradient", main)
+	bg.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, darken(self.Config.Accent, 200)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(8,8,8)),
+		ColorSequenceKeypoint.new(1, darken(self.Config.Accent, 200))
+	}
+	bg.Rotation = 45
+	self.BgGrad = bg
+	addSpin(bg, 0.8, "Grad")
+	
+	-- Title
+	local title = Instance.new("TextLabel", main)
+	title.Size = UDim2.new(1, -72, 0, 26)
+	title.Position = UDim2.new(0, 6, 0, 2)
+	title.BackgroundTransparency = 1
+	title.Text = self.Config.Title
+	title.TextColor3 = self.Config.Accent
+	title.TextSize = 17
+	setFont(title, FONTS.Title)
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	title.ZIndex = 5
+	self.Title = title
+	
+	-- Settings btn
+	local gearBtn = Instance.new("ImageButton", main)
+	gearBtn.Size = UDim2.new(0,26,0,26)
+	gearBtn.Position = UDim2.new(1,-58,0,2)
+	gearBtn.BackgroundTransparency = 1
+	gearBtn.Image = ICONS.Gear
+	gearBtn.ImageColor3 = Color3.fromRGB(255,120,120)
+	gearBtn.AutoButtonColor = false
+	gearBtn.ZIndex = 5
+	self.GearBtn = gearBtn
+	
+	-- Min button
+	local minBtn = Instance.new("ImageButton", main)
+	minBtn.Size = UDim2.new(0,26,0,26)
+	minBtn.Position = UDim2.new(1,-30,0,2)
+	minBtn.BackgroundColor3 = Color3.fromRGB(35,10,10)
+	minBtn.BorderSizePixel = 0
+	minBtn.Image = ICONS.Min
+	minBtn.ImageColor3 = Color3.fromRGB(255,120,120)
+	minBtn.AutoButtonColor = false
+	minBtn.ZIndex = 5
+	Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 4)
+	self.MinBtn = minBtn
+	
+	-- Body container (for tabs)
+	local body = Instance.new("Frame", main)
+	body.Size = UDim2.new(1, -12, 1, -40)
+	body.Position = UDim2.new(0, 6, 0, 34)
+	body.BackgroundTransparency = 1
+	body.ZIndex = 5
+	self.Body = body
+	
+	-- Minimal init: search + content
+	self:_wireToggle()
+	self:_wireMinimize()
+	self:_wireDrag()
+	self:_wireResize()
+end
+
+-- ================== TOGGLE ==================
+function ToolxUI:_wireToggle()
+	local open = false
+	local cd = false
+	self.ToggleBtn.MouseButton1Click:Connect(function()
+		if cd then return end
+		self:PlayClick()
+		cd = true
+		open = not open
+		if open then
+			self.Main.Visible = true
+			self:Shockwave(self.ToggleBtn, 40, self.Config.Accent, Color3.fromRGB(255,220,0), 0.85)
+			task.wait(0.08)
+			self:Shockwave(self.ToggleBtn, 30, Color3.fromRGB(0,220,255), Color3.fromRGB(255,0,200), 0.75)
+			task.wait(0.06)
+			self:Shockwave(self.ToggleBtn, 55, Color3.fromRGB(255,255,255), self.Config.Accent, 1)
+			self:BurstAt(self.ToggleBtn.AbsolutePosition.X + self.ToggleBtn.AbsoluteSize.X/2 - self.FxGui.AbsolutePosition.X,
+				self.ToggleBtn.AbsolutePosition.Y + self.ToggleBtn.AbsoluteSize.Y/2 - self.FxGui.AbsolutePosition.Y,
+				self.Config.Accent, Color3.fromRGB(255,220,0), 12, 35)
+			self:ShakeFrame(self.ToggleBtn, 5, 0.2)
+			TweenService:Create(self.ToggleBtn, Ease.BackOut, {Size = UDim2.new(0,50,0,50)}):Play()
+			task.delay(0.15, function()
+				TweenService:Create(self.ToggleBtn, Ease.QuintOut, {Size = UDim2.new(0,42,0,42)}):Play()
+			end)
+			TweenService:Create(self.Main, Ease.QuintOut, {
+				Position = UDim2.new(0.5, -self.Config.Width/2, 0.5, -self.Config.Height/2)
+			}):Play()
+		else
+			TweenService:Create(self.Main, Ease.QuintOut, {
+				Position = UDim2.new(0.5, -self.Config.Width/2, 1.5, 0)
+			}):Play()
+			task.wait(0.35)
+			self.Main.Visible = false
+		end
+		task.wait(0.4)
+		cd = false
+	end)
+	self.IsOpen = function() return open end
+end
+
+-- ================== MINIMIZE ==================
+function ToolxUI:_wireMinimize()
+	local minimized = false
+	self.MinBtn.MouseButton1Click:Connect(function()
+		self:PlayClick()
+		minimized = not minimized
+		self.MinBtn.Image = minimized and ICONS.Max or ICONS.Min
+		self:BurstAt(self.MinBtn.AbsolutePosition.X + self.MinBtn.AbsoluteSize.X/2 - self.FxGui.AbsolutePosition.X,
+			self.MinBtn.AbsolutePosition.Y + self.MinBtn.AbsoluteSize.Y/2 - self.FxGui.AbsolutePosition.Y,
+			Color3.fromRGB(255,100,100), Color3.fromRGB(150,0,0), 8, 25)
+		self:ShakeFrame(self.Main, 4, 0.2)
+		self:Shockwave(self.MinBtn, 20, self.Config.Accent, darken(self.Config.Accent, 100), 0.55)
+		TweenService:Create(self.Main, Ease.QuintOut, {
+			Size = minimized and UDim2.new(0, self.Config.Width, 0, 34)
+				or UDim2.new(0, self.Config.Width, 0, self.Config.Height)
+		}):Play()
+		if self.Body then
+			self.Body.Visible = not minimized
+		end
+	end)
+end
+
+-- ================== DRAG ==================
+function ToolxUI:_wireDrag()
+	if not self.Config.Draggable then return end
+	local dragging, dragStart, startPos = false, nil, nil
+	self.Main.InputBegan:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+			dragging, dragStart, startPos = true, i.Position, self.Main.Position
+		end
+	end)
+	self.Main.InputEnded:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+	UIS.InputChanged:Connect(function(i)
+		if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+			local d = i.Position - dragStart
+			self.Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+		end
+	end)
+end
+
+-- ================== RESIZE ==================
+function ToolxUI:_wireResize()
+	if not self.Config.Resizable then return end
+	local handle = Instance.new("TextButton", self.Main)
+	handle.Size = UDim2.new(0, 16, 0, 16)
+	handle.Position = UDim2.new(1, -18, 1, -18)
+	handle.BackgroundTransparency = 1
+	handle.Text = ""
+	handle.ZIndex = 10
+	local dragging, dragStart, startSize = false, nil, nil
+	handle.InputBegan:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+			dragging, dragStart, startSize = true, i.Position, self.Main.AbsoluteSize
+		end
+	end)
+	handle.InputEnded:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+	UIS.InputChanged:Connect(function(i)
+		if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+			local d = i.Position - dragStart
+			local w = math.clamp(startSize.X + d.X, self.Config.MinWidth, self.Config.MaxWidth)
+			local h = math.clamp(startSize.Y + d.Y, self.Config.MinHeight, self.Config.MaxHeight)
+			self.Main.Size = UDim2.new(0, w, 0, h)
+			self.Config.Width = w
+			self.Config.Height = h
+		end
+	end)
+end
+
+-- ================== TAB SYSTEM ==================
+function ToolxUI:CreateTab(name)
+	local tab = {Name = name, Elements = {}, Parent = self}
+	
+	local btn = Instance.new("TextButton", self.Body)
+	btn.Size = UDim2.new(1, 0, 0, 28)
+	btn.BackgroundColor3 = Color3.fromRGB(28,10,10)
+	btn.BorderSizePixel = 0
+	btn.Text = name
+	btn.TextColor3 = self.Theme.Text
+	btn.TextSize = 13
+	setFont(btn, FONTS.Bold)
+	btn.AutoButtonColor = false
+	btn.ZIndex = 5
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+	
+	table.insert(self.Tabs, {Name = name, Button = btn, Tab = tab, Container = nil})
+	return tab
+end
+
+-- ================== WINDOW METHODS ==================
+function ToolxUI:SetAccent(color)
+	self.Config.Accent = color
+	self.Theme.Accent = color
+	safe(function()
+		self.StrokeGrad.Color = ColorSequence.new{
+			ColorSequenceKeypoint.new(0, color),
+			ColorSequenceKeypoint.new(0.5, brighten(color, 70)),
+			ColorSequenceKeypoint.new(1, color)
+		}
+		self.BgGrad.Color = ColorSequence.new{
+			ColorSequenceKeypoint.new(0, darken(color, 200)),
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(8,8,8)),
+			ColorSequenceKeypoint.new(1, darken(color, 200))
+		}
+		self.Title.TextColor3 = color
+		self.ToggleBtn.TextColor3 = color
+		self.ToggleStroke.Color = ColorSequence.new{
+			ColorSequenceKeypoint.new(0, color),
+			ColorSequenceKeypoint.new(0.5, darken(color, 100)),
+			ColorSequenceKeypoint.new(1, color)
+		}
+		self.GearBtn.ImageColor3 = color
+		self.MinBtn.ImageColor3 = color
+	end)
+end
+
+function ToolxUI:SetSize(w, h)
+	w = math.clamp(w, self.Config.MinWidth, self.Config.MaxWidth)
+	h = math.clamp(h, self.Config.MinHeight, self.Config.MaxHeight)
+	self.Config.Width, self.Config.Height = w, h
+	self.Main.Size = UDim2.new(0, w, 0, h)
+	if self.IsOpen and self.IsOpen() then
+		self.Main.Position = UDim2.new(0.5, -w/2, 0.5, -h/2)
+	end
+end
+
+function ToolxUI:SetTitle(text)
+	self.Config.Title = text
+	self.Title.Text = text
+end
+
+function ToolxUI:SetTheme(themeName)
+	local t = ToolxUI.Themes[themeName]
+	if not t then return end
+	self.Theme = t
+	self.Config.Theme = themeName
+	self:SetAccent(t.Accent)
+end
+
+function ToolxUI:ToggleEffects(key, value)
+	if self.Config.Effects[key] ~= nil then
+		self.Config.Effects[key] = value
+	end
+end
+
+function ToolxUI:Destroy()
+	safe(function() self.Gui:Destroy() end)
+	safe(function() self.NotifGui:Destroy() end)
+	safe(function() self.FxGui:Destroy() end)
+	safe(function() if self.TooltipGui then self.TooltipGui:Destroy() end end)
+	safe(function() if self.KeyGui then self.KeyGui:Destroy() end end)
+end
+
+-- ================== COMPONENT BUILDERS ==================
+-- Shared helper for buttons with shine/gradient
+local function makeStyled(parent, text, pos, size, col, accentColor)
+	local b = Instance.new("TextButton", parent)
+	b.Size = size or UDim2.new(1, 0, 0, 28)
+	b.Position = pos or UDim2.new(0, 0, 0, 0)
+	b.BackgroundColor3 = col
+	b.BorderSizePixel = 0
+	b.Text = text or ""
+	b.TextColor3 = Color3.new(1,1,1)
+	b.TextSize = 13
+	setFont(b, FONTS.Title)
+	b.AutoButtonColor = false
+	b.ZIndex = 5
+	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+	local g = Instance.new("UIGradient", b)
+	g.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, col),
+		ColorSequenceKeypoint.new(0.5, brighten(col, 40)),
+		ColorSequenceKeypoint.new(1, col)
+	}
+	g.Rotation = 30
+	local s = Instance.new("Frame", b)
+	s.Size = UDim2.new(1,0,1,0)
+	s.BackgroundColor3 = Color3.fromRGB(255,255,255)
+	s.BackgroundTransparency = 0.82
+	s.BorderSizePixel = 0
+	s.ZIndex = 6
+	Instance.new("UICorner", s).CornerRadius = UDim.new(0, 4)
+	local sg = Instance.new("UIGradient", s)
+	sg.Color = ColorSequence.new(Color3.fromRGB(255,255,255), Color3.fromRGB(255,255,255))
+	sg.Transparency = NumberSequence.new{
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.42, 1),
+		NumberSequenceKeypoint.new(0.5, 0.15),
+		NumberSequenceKeypoint.new(0.58, 1),
+		NumberSequenceKeypoint.new(1, 1)
+	}
+	sg.Rotation = 30
+	addShine(sg, 0.014)
+	return b, g
+end
+
+-- Button
+function ToolxUI:CreateButton(parent, cfg)
+	local cfg = cfg or {}
+	local b, g = makeStyled(parent, cfg.Text or "Button", nil, UDim2.new(1, 0, 0, cfg.Height or 28), cfg.Color or self.Config.Accent)
+	b:SetAttribute("BaseColor", cfg.Color or self.Config.Accent)
+	b.MouseEnter:Connect(function()
+		self:PlayHover()
+		local base = b:GetAttribute("BaseColor")
+		TweenService:Create(b, Ease.SineInOut, {BackgroundColor3 = brighten(base, 35)}):Play()
+	end)
+	b.MouseLeave:Connect(function()
+		local base = b:GetAttribute("BaseColor")
+		TweenService:Create(b, Ease.SineInOut, {BackgroundColor3 = base}):Play()
+	end)
+	b.MouseButton1Click:Connect(function()
+		self:PlayClick()
+		if cfg.Callback then safe(cfg.Callback) end
+	end)
+	if cfg.Tooltip then self:AttachTooltip(b, cfg.Tooltip) end
+	self.Elements[#self.Elements+1] = b
+	return b
+end
+
+-- Toggle
+function ToolxUI:CreateToggle(parent, cfg)
+	local cfg = cfg or {}
+	local state = cfg.Default or false
+	local b = Instance.new("TextButton", parent)
+	b.Size = UDim2.new(1, 0, 0, cfg.Height or 28)
+	b.BackgroundColor3 = state and self.Config.Accent or Color3.fromRGB(40,12,12)
+	b.BorderSizePixel = 0
+	b.Text = (cfg.Text or "Toggle")..": "..(state and "ON" or "OFF")
+	b.TextColor3 = Color3.new(1,1,1)
+	b.TextSize = 12
+	setFont(b, FONTS.Bold)
+	b.AutoButtonColor = false
+	b.ZIndex = 5
+	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+	b:SetAttribute("BaseColor", b.BackgroundColor3)
+	b.MouseButton1Click:Connect(function()
+		self:PlayClick()
+		state = not state
+		local c = state and self.Config.Accent or Color3.fromRGB(40,12,12)
+		b.BackgroundColor3 = c
+		b:SetAttribute("BaseColor", c)
+		b.Text = (cfg.Text or "Toggle")..": "..(state and "ON" or "OFF")
+		if cfg.Callback then safe(cfg.Callback, state) end
+	end)
+	b.MouseEnter:Connect(function()
+		self:PlayHover()
+		local base = b:GetAttribute("BaseColor")
+		TweenService:Create(b, Ease.SineInOut, {BackgroundColor3 = brighten(base, 35)}):Play()
+	end)
+	b.MouseLeave:Connect(function()
+		local base = b:GetAttribute("BaseColor")
+		TweenService:Create(b, Ease.SineInOut, {BackgroundColor3 = base}):Play()
+	end)
+	if cfg.Tooltip then self:AttachTooltip(b, cfg.Tooltip) end
+	self.Elements[#self.Elements+1] = b
+	return b
+end
+
+-- Slider
+function ToolxUI:CreateSlider(parent, cfg)
+	local cfg = cfg or {}
+	local min, max = cfg.Min or 0, cfg.Max or 100
+	local val = math.clamp(cfg.Default or min, min, max)
+	local holder = Instance.new("Frame", parent)
+	holder.Size = UDim2.new(1, 0, 0, cfg.Height or 38)
+	holder.BackgroundTransparency = 1
+	holder.ZIndex = 5
+	
+	local lbl = Instance.new("TextLabel", holder)
+	lbl.Size = UDim2.new(1, 0, 0, 16)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = (cfg.Text or "Slider")..": "..tostring(val)
+	lbl.TextColor3 = self.Theme.Text
+	lbl.TextSize = 12
+	setFont(lbl, FONTS.Bold)
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.ZIndex = 5
+	
+	local track = Instance.new("TextButton", holder)
+	track.Size = UDim2.new(1, 0, 0, 12)
+	track.Position = UDim2.new(0, 0, 0, 20)
+	track.BackgroundColor3 = Color3.fromRGB(30,10,10)
+	track.BorderSizePixel = 0
+	track.Text = ""
+	track.AutoButtonColor = false
+	track.ZIndex = 5
+	Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+	
+	local fill = Instance.new("Frame", track)
+	fill.Size = UDim2.new((val-min)/(max-min), 0, 1, 0)
+	fill.BackgroundColor3 = self.Config.Accent
+	fill.BorderSizePixel = 0
+	fill.ZIndex = 6
+	Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+	local fg = Instance.new("UIGradient", fill)
+	fg.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, self.Config.Accent),
+		ColorSequenceKeypoint.new(1, brighten(self.Config.Accent, 50))
+	}
+	fg.Rotation = 30
+	
+	local dragging = false
+	local function update(x)
+		local pos = math.clamp((x - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+		val = math.floor(min + (max-min) * pos + 0.5)
+		fill.Size = UDim2.new(pos, 0, 1, 0)
+		lbl.Text = (cfg.Text or "Slider")..": "..tostring(val)
+		if cfg.Callback then safe(cfg.Callback, val) end
+	end
+	track.InputBegan:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			update(i.Position.X)
+		end
+	end)
+	UIS.InputChanged:Connect(function(i)
+		if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+			update(i.Position.X)
+		end
+	end)
+	UIS.InputEnded:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+	self.Elements[#self.Elements+1] = holder
+	return holder, function() return val end
+end
+
+-- TextBox
+function ToolxUI:CreateTextBox(parent, cfg)
+	local cfg = cfg or {}
+	local box = Instance.new("TextBox", parent)
+	box.Size = UDim2.new(1, 0, 0, cfg.Height or 30)
+	box.BackgroundColor3 = Color3.fromRGB(22,8,8)
+	box.BorderSizePixel = 0
+	box.PlaceholderText = cfg.Placeholder or "Enter..."
+	box.PlaceholderColor3 = Color3.fromRGB(150,80,80)
+	box.Text = cfg.Default or ""
+	box.TextColor3 = self.Theme.Text
+	box.TextSize = 13
+	setFont(box, FONTS.Body)
+	box.ClearTextOnFocus = false
+	box.ZIndex = 5
+	Instance.new("UICorner", box).CornerRadius = UDim.new(0, 4)
+	box.FocusLost:Connect(function()
+		self:PlayClick(1.2)
+		if cfg.Callback then safe(cfg.Callback, box.Text) end
+	end)
+	if cfg.Tooltip then self:AttachTooltip(box, cfg.Tooltip) end
+	self.Elements[#self.Elements+1] = box
+	return box
+end
+
+-- Dropdown
+function ToolxUI:CreateDropdown(parent, cfg)
+	local cfg = cfg or {}
+	local options = cfg.Options or {}
+	local current = cfg.Default or options[1]
+	local open = false
+	
+	local holder = Instance.new("Frame", parent)
+	holder.Size = UDim2.new(1, 0, 0, cfg.Height or 30)
+	holder.BackgroundTransparency = 1
+	holder.ClipsDescendants = false
+	holder.ZIndex = 5
+	
+	local btn = Instance.new("TextButton", holder)
+	btn.Size = UDim2.new(1, 0, 0, 30)
+	btn.BackgroundColor3 = Color3.fromRGB(30,15,15)
+	btn.BorderSizePixel = 0
+	btn.Text = (cfg.Text and (cfg.Text..": ") or "")..tostring(current).."  ▼"
+	btn.TextColor3 = self.Theme.Text
+	btn.TextSize = 13
+	setFont(btn, FONTS.Body)
+	btn.AutoButtonColor = false
+	btn.TextXAlignment = Enum.TextXAlignment.Left
+	btn.ZIndex = 7
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+	
+	local list = Instance.new("Frame", holder)
+	list.Size = UDim2.new(1, 0, 0, 0)
+	list.Position = UDim2.new(0, 0, 0, 32)
+	list.BackgroundColor3 = Color3.fromRGB(18,8,8)
+	list.BorderSizePixel = 0
+	list.ClipsDescendants = true
+	list.ZIndex = 10
+	Instance.new("UICorner", list).CornerRadius = UDim.new(0, 4)
+	local lLay = Instance.new("UIListLayout", list)
+	lLay.Padding = UDim.new(0, 3)
+	
+	for i, opt in ipairs(options) do
+		local b = Instance.new("TextButton", list)
+		b.Size = UDim2.new(1, -4, 0, 26)
+		b.Position = UDim2.new(0, 2, 0, 2 + (i-1)*29)
+		b.BackgroundColor3 = Color3.fromRGB(28,10,10)
+		b.BorderSizePixel = 0
+		b.Text = tostring(opt)
+		b.TextColor3 = self.Theme.Text
+		b.TextSize = 12
+		setFont(b, FONTS.Body)
+		b.AutoButtonColor = false
+		b.TextXAlignment = Enum.TextXAlignment.Left
+		b.ZIndex = 11
+		b.LayoutOrder = i
+		Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+		b.MouseButton1Click:Connect(function()
+			self:PlayClick()
+			current = opt
+			btn.Text = (cfg.Text and (cfg.Text..": ") or "")..tostring(current).."  ▼"
+			open = false
+			TweenService:Create(list, Ease.QuintOut, {Size = UDim2.new(1,0,0,0)}):Play()
+			if cfg.Callback then safe(cfg.Callback, current) end
+		end)
+	end
+	
+	btn.MouseButton1Click:Connect(function()
+		self:PlayClick()
+		open = not open
+		local targetH = open and (#options * 29 + 4) or 0
+		TweenService:Create(list, Ease.QuintOut, {Size = UDim2.new(1,0,0,targetH)}):Play()
+	end)
+	self.Elements[#self.Elements+1] = holder
+	return holder, function() return current end
+end
+
+-- Section header
+function ToolxUI:CreateSection(parent, text)
+	local lbl = Instance.new("TextLabel", parent)
+	lbl.Size = UDim2.new(1, 0, 0, 20)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = text
+	lbl.TextColor3 = self.Config.Accent
+	lbl.TextSize = 13
+	setFont(lbl, FONTS.Title)
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.ZIndex = 5
+	local g = Instance.new("UIGradient", lbl)
+	g.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, self.Config.Accent),
+		ColorSequenceKeypoint.new(0.5, brighten(self.Config.Accent, 80)),
+		ColorSequenceKeypoint.new(1, self.Config.Accent)
+	}
+	g.Rotation = 45
+	addShine(g, 0.02)
+	self.Elements[#self.Elements+1] = lbl
+	return lbl
+end
+
+-- Label
+function ToolxUI:CreateLabel(parent, cfg)
+	local cfg = type(cfg) == "table" and cfg or {Text = cfg}
+	local lbl = Instance.new("TextLabel", parent)
+	lbl.Size = UDim2.new(1, 0, 0, cfg.Height or 18)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = cfg.Text or ""
+	lbl.TextColor3 = cfg.Color or self.Theme.SubText
+	lbl.TextSize = cfg.Size or 12
+	setFont(lbl, FONTS.Reg)
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.ZIndex = 5
+	self.Elements[#self.Elements+1] = lbl
+	return lbl
+end
+
+-- Divider
+function ToolxUI:CreateDivider(parent)
+	local f = Instance.new("Frame", parent)
+	f.Size = UDim2.new(1, 0, 0, 1)
+	f.BackgroundColor3 = Color3.fromRGB(60,20,20)
+	f.BorderSizePixel = 0
+	f.ZIndex = 5
+	self.Elements[#self.Elements+1] = f
+	return f
+end
+
+-- Color picker
+function ToolxUI:CreateColorPicker(parent, cfg)
+	local cfg = cfg or {}
+	local holder = Instance.new("Frame", parent)
+	holder.Size = UDim2.new(1, 0, 0, 80)
+	holder.BackgroundTransparency = 1
+	holder.ZIndex = 5
+	local lbl = Instance.new("TextLabel", holder)
+	lbl.Size = UDim2.new(1, 0, 0, 16)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = cfg.Text or "Color"
+	lbl.TextColor3 = self.Theme.Text
+	lbl.TextSize = 12
+	setFont(lbl, FONTS.Bold)
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.ZIndex = 5
+	
+	local presets = cfg.Presets or {
+		Color3.fromRGB(220,20,20), Color3.fromRGB(255,120,40), Color3.fromRGB(255,220,60),
+		Color3.fromRGB(40,220,80), Color3.fromRGB(40,180,255), Color3.fromRGB(80,80,255),
+		Color3.fromRGB(200,60,255), Color3.fromRGB(255,100,180)
+	}
+	local swHolder = Instance.new("Frame", holder)
+	swHolder.Size = UDim2.new(1, 0, 0, 26)
+	swHolder.Position = UDim2.new(0, 0, 0, 20)
+	swHolder.BackgroundTransparency = 1
+	swHolder.ZIndex = 5
+	local swL = Instance.new("UIListLayout", swHolder)
+	swL.FillDirection = Enum.FillDirection.Horizontal
+	swL.Padding = UDim.new(0, 3)
+	for i, c in ipairs(presets) do
+		local s = Instance.new("TextButton", swHolder)
+		s.Size = UDim2.new(0, 26, 1, 0)
+		s.BackgroundColor3 = c
+		s.BorderSizePixel = 0
+		s.Text = ""
+		s.AutoButtonColor = false
+		s.ZIndex = 5
+		s.LayoutOrder = i
+		Instance.new("UICorner", s).CornerRadius = UDim.new(0, 4)
+		s.MouseButton1Click:Connect(function()
+			self:PlayClick()
+			if cfg.Callback then safe(cfg.Callback, c) end
+		end)
+	end
+	self.Elements[#self.Elements+1] = holder
+	return holder
+end
+
+-- Progress bar
+function ToolxUI:CreateProgressBar(parent, cfg)
+	local cfg = cfg or {}
+	local holder = Instance.new("Frame", parent)
+	holder.Size = UDim2.new(1, 0, 0, 30)
+	holder.BackgroundTransparency = 1
+	holder.ZIndex = 5
+	local lbl = Instance.new("TextLabel", holder)
+	lbl.Size = UDim2.new(1, 0, 0, 14)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = cfg.Text or "Progress"
+	lbl.TextColor3 = self.Theme.Text
+	lbl.TextSize = 11
+	setFont(lbl, FONTS.Bold)
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.ZIndex = 5
+	local track = Instance.new("Frame", holder)
+	track.Size = UDim2.new(1, 0, 0, 10)
+	track.Position = UDim2.new(0, 0, 0, 18)
+	track.BackgroundColor3 = Color3.fromRGB(30,10,10)
+	track.BorderSizePixel = 0
+	track.ZIndex = 5
+	Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+	local fill = Instance.new("Frame", track)
+	fill.Size = UDim2.new(0, 0, 1, 0)
+	fill.BackgroundColor3 = self.Config.Accent
+	fill.BorderSizePixel = 0
+	fill.ZIndex = 6
+	Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+	local setVal
+	setVal = function(v)
+		v = math.clamp(v, 0, 1)
+		TweenService:Create(fill, Ease.QuintOut, {Size = UDim2.new(v, 0, 1, 0)}):Play()
+		lbl.Text = (cfg.Text or "Progress")..": "..math.floor(v*100).."%"
+	end
+	self.Elements[#self.Elements+1] = holder
+	return holder, setVal
+end
+
+-- Keybind
+function ToolxUI:CreateKeybind(parent, cfg)
+	local cfg = cfg or {}
+	local key = cfg.Default or Enum.KeyCode.F
+	local b = Instance.new("TextButton", parent)
+	b.Size = UDim2.new(1, 0, 0, 28)
+	b.BackgroundColor3 = Color3.fromRGB(30,15,15)
+	b.BorderSizePixel = 0
+	b.Text = (cfg.Text or "Keybind")..": "..key.Name
+	b.TextColor3 = self.Theme.Text
+	b.TextSize = 12
+	setFont(b, FONTS.Bold)
+	b.AutoButtonColor = false
+	b.ZIndex = 5
+	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+	
+	local listening = false
+	b.MouseButton1Click:Connect(function()
+		self:PlayClick()
+		listening = true
+		b.Text = (cfg.Text or "Keybind")..": [press key...]"
+	end)
+	
+	local conn
+	conn = UIS.InputBegan:Connect(function(i, gp)
+		if gp then return end
+		if listening and i.UserInputType == Enum.UserInputType.Keyboard then
+			key = i.KeyCode
+			listening = false
+			b.Text = (cfg.Text or "Keybind")..": "..key.Name
+			if cfg.Callback then safe(cfg.Callback, key) end
+		end
+		if not listening and i.KeyCode == key and not gp then
+			if cfg.OnPress then safe(cfg.OnPress) end
+		end
+	end)
+	self.Elements[#self.Elements+1] = b
+	return b, function() return key end
+end
+
+-- Input number
+function ToolxUI:CreateNumberInput(parent, cfg)
+	local cfg = cfg or {}
+	local val = cfg.Default or 0
+	local box = Instance.new("TextBox", parent)
+	box.Size = UDim2.new(1, 0, 0, 28)
+	box.BackgroundColor3 = Color3.fromRGB(22,8,8)
+	box.BorderSizePixel = 0
+	box.Text = tostring(val)
+	box.PlaceholderText = cfg.Placeholder or "0"
+	box.PlaceholderColor3 = Color3.fromRGB(150,80,80)
+	box.TextColor3 = self.Theme.Text
+	box.TextSize = 13
+	setFont(box, FONTS.Body)
+	box.ZIndex = 5
+	Instance.new("UICorner", box).CornerRadius = UDim.new(0, 4)
+	box.FocusLost:Connect(function()
+		local n = tonumber(box.Text) or (cfg.Default or 0)
+		n = math.clamp(n, cfg.Min or -math.huge, cfg.Max or math.huge)
+		box.Text = tostring(n)
+		if cfg.Callback then safe(cfg.Callback, n) end
+	end)
+	self.Elements[#self.Elements+1] = box
+	return box
+end
+
+-- Checkbox
+function ToolxUI:CreateCheckbox(parent, cfg)
+	local cfg = cfg or {}
+	local state = cfg.Default or false
+	local holder = Instance.new("Frame", parent)
+	holder.Size = UDim2.new(1, 0, 0, 24)
+	holder.BackgroundTransparency = 1
+	holder.ZIndex = 5
+	local box = Instance.new("TextButton", holder)
+	box.Size = UDim2.new(0, 20, 0, 20)
+	box.Position = UDim2.new(0, 0, 0, 2)
+	box.BackgroundColor3 = Color3.fromRGB(30,10,10)
+	box.BorderSizePixel = 0
+	box.Text = state and "✓" or ""
+	box.TextColor3 = Color3.new(1,1,1)
+	box.TextSize = 13
+	setFont(box, FONTS.Bold)
+	box.AutoButtonColor = false
+	box.ZIndex = 5
+	Instance.new("UICorner", box).CornerRadius = UDim.new(0, 4)
+	local lbl = Instance.new("TextLabel", holder)
+	lbl.Size = UDim2.new(1, -26, 1, 0)
+	lbl.Position = UDim2.new(0, 26, 0, 0)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = cfg.Text or "Checkbox"
+	lbl.TextColor3 = self.Theme.Text
+	lbl.TextSize = 12
+	setFont(lbl, FONTS.Body)
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.ZIndex = 5
+	box.MouseButton1Click:Connect(function()
+		self:PlayClick()
+		state = not state
+		box.Text = state and "✓" or ""
+		box.BackgroundColor3 = state and self.Config.Accent or Color3.fromRGB(30,10,10)
+		if cfg.Callback then safe(cfg.Callback, state) end
+	end)
+	self.Elements[#self.Elements+1] = holder
+	return holder, function() return state end
+end
+
+-- Radio buttons
+function ToolxUI:CreateRadio(parent, cfg)
+	local cfg = cfg or {}
+	local options = cfg.Options or {}
+	local selected = cfg.Default or options[1]
+	local holder = Instance.new("Frame", parent)
+	holder.Size = UDim2.new(1, 0, 0, #options * 24 + 18)
+	holder.BackgroundTransparency = 1
+	holder.ZIndex = 5
+	local lbl = Instance.new("TextLabel", holder)
+	lbl.Size = UDim2.new(1, 0, 0, 16)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = cfg.Text or "Radio"
+	lbl.TextColor3 = self.Theme.Text
+	lbl.TextSize = 12
+	setFont(lbl, FONTS.Bold)
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.ZIndex = 5
+	local buttons = {}
+	for i, opt in ipairs(options) do
+		local b = Instance.new("TextButton", holder)
+		b.Size = UDim2.new(1, 0, 0, 22)
+		b.Position = UDim2.new(0, 0, 0, 18 + (i-1)*24)
+		b.BackgroundColor3 = Color3.fromRGB(28,10,10)
+		b.BorderSizePixel = 0
+		b.Text = (opt == selected and "◉ " or "○ ")..tostring(opt)
+		b.TextColor3 = self.Theme.Text
+		b.TextSize = 12
+		setFont(b, FONTS.Body)
+		b.AutoButtonColor = false
+		b.TextXAlignment = Enum.TextXAlignment.Left
+		b.ZIndex = 5
+		Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+		buttons[opt] = b
+		b.MouseButton1Click:Connect(function()
+			self:PlayClick()
+			selected = opt
+			for k, btn in pairs(buttons) do
+				btn.Text = (k == selected and "◉ " or "○ ")..tostring(k)
+			end
+			if cfg.Callback then safe(cfg.Callback, opt) end
+		end)
+	end
+	self.Elements[#self.Elements+1] = holder
+	return holder, function() return selected end
+end
+
+-- Multi dropdown
+function ToolxUI:CreateMultiDropdown(parent, cfg)
+	local cfg = cfg or {}
+	local options = cfg.Options or {}
+	local selected = cfg.Default or {}
+	local open = false
+	local function makeText()
+		local t = {}
+		for _, v in pairs(selected) do table.insert(t, v) end
+		return #t > 0 and table.concat(t, ", ") or "(none)"
+	end
+	local holder = Instance.new("Frame", parent)
+	holder.Size = UDim2.new(1, 0, 0, 30)
+	holder.BackgroundTransparency = 1
+	holder.ZIndex = 5
+	local btn = Instance.new("TextButton", holder)
+	btn.Size = UDim2.new(1, 0, 0, 30)
+	btn.BackgroundColor3 = Color3.fromRGB(30,15,15)
+	btn.BorderSizePixel = 0
+	btn.Text = (cfg.Text and (cfg.Text..": ") or "")..makeText().."  ▼"
+	btn.TextColor3 = self.Theme.Text
+	btn.TextSize = 13
+	setFont(btn, FONTS.Body)
+	btn.AutoButtonColor = false
+	btn.TextXAlignment = Enum.TextXAlignment.Left
+	btn.ZIndex = 7
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+	
+	local list = Instance.new("Frame", holder)
+	list.Size = UDim2.new(1, 0, 0, 0)
+	list.Position = UDim2.new(0, 0, 0, 32)
+	list.BackgroundColor3 = Color3.fromRGB(18,8,8)
+	list.BorderSizePixel = 0
+	list.ClipsDescendants = true
+	list.ZIndex = 10
+	Instance.new("UICorner", list).CornerRadius = UDim.new(0, 4)
+	for i, opt in ipairs(options) do
+		local b = Instance.new("TextButton", list)
+		b.Size = UDim2.new(1, -4, 0, 26)
+		b.Position = UDim2.new(0, 2, 0, 2 + (i-1)*29)
+		b.BackgroundColor3 = selected[opt] and self.Config.Accent or Color3.fromRGB(28,10,10)
+		b.BorderSizePixel = 0
+		b.Text = tostring(opt)
+		b.TextColor3 = self.Theme.Text
+		b.TextSize = 12
+		setFont(b, FONTS.Body)
+		b.AutoButtonColor = false
+		b.TextXAlignment = Enum.TextXAlignment.Left
+		b.ZIndex = 11
+		b.LayoutOrder = i
+		Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+		b.MouseButton1Click:Connect(function()
+			self:PlayClick()
+			selected[opt] = not selected[opt]
+			b.BackgroundColor3 = selected[opt] and self.Config.Accent or Color3.fromRGB(28,10,10)
+			btn.Text = (cfg.Text and (cfg.Text..": ") or "")..makeText().."  ▼"
+			if cfg.Callback then safe(cfg.Callback, selected) end
+		end)
+	end
+	btn.MouseButton1Click:Connect(function()
+		self:PlayClick()
+		open = not open
+		local targetH = open and (#options * 29 + 4) or 0
+		TweenService:Create(list, Ease.QuintOut, {Size = UDim2.new(1,0,0,targetH)}):Play()
+	end)
+	self.Elements[#self.Elements+1] = holder
+	return holder, function() return selected end
+end
+
+-- Search filter (for player lists etc)
+function ToolxUI:CreateSearchBar(parent, cfg)
+	local cfg = cfg or {}
+	local box = self:CreateTextBox(parent, {
+		Placeholder = cfg.Placeholder or "Search...",
+		Callback = cfg.Callback,
+	})
+	return box
+end
+
+-- Player list
+function ToolxUI:CreatePlayerList(parent, cfg)
+	local cfg = cfg or {}
+	local scrolling = Instance.new("ScrollingFrame", parent)
+	scrolling.Size = UDim2.new(1, 0, 0, cfg.Height or 100)
+	scrolling.BackgroundColor3 = Color3.fromRGB(18,8,8)
+	scrolling.BorderSizePixel = 0
+	scrolling.ScrollBarThickness = 3
+	scrolling.CanvasSize = UDim2.new(0,0,0,0)
+	scrolling.ZIndex = 5
+	Instance.new("UICorner", scrolling).CornerRadius = UDim.new(0, 4)
+	Instance.new("UIListLayout", scrolling).Padding = UDim.new(0, 3)
+	
+	local selected = nil
+	local function update()
+		for _, c in ipairs(scrolling:GetChildren()) do
+			if c:IsA("TextButton") then c:Destroy() end
+		end
+		local y = 0
+		for _, p in ipairs(Players:GetPlayers()) do
+			if p ~= lp then
+				local b = Instance.new("TextButton", scrolling)
+				b.Size = UDim2.new(1,-4,0,26)
+				b.BackgroundColor3 = Color3.fromRGB(28,10,10)
+				b.BorderSizePixel = 0
+				b.Text = p.DisplayName
+				b.TextColor3 = self.Theme.Text
+				b.TextSize = 13
+				setFont(b, FONTS.Body)
+				b.AutoButtonColor = false
+				b.TextXAlignment = Enum.TextXAlignment.Left
+				b.ZIndex = 5
+				Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+				b.MouseButton1Click:Connect(function()
+					self:PlayClick()
+					selected = p
+					for _, x in ipairs(scrolling:GetChildren()) do
+						if x:IsA("TextButton") then x.BackgroundColor3 = Color3.fromRGB(28,10,10) end
+					end
+					b.BackgroundColor3 = self.Config.Accent
+					if cfg.Callback then safe(cfg.Callback, p) end
+				end)
+				y += 29
+			end
+		end
+		scrolling.CanvasSize = UDim2.new(0,0,0,y)
+	end
+	Players.PlayerAdded:Connect(update)
+	Players.PlayerRemoving:Connect(update)
+	update()
+	self.Elements[#self.Elements+1] = scrolling
+	return scrolling, function() return selected end
+end
+
+-- Config system (save/load)
+function ToolxUI:SaveConfig(name)
+	if not name or name == "" then return false end
+	local folder = self.Config.ConfigFolder
+	safe(function() if not isfolder(folder) then makefolder(folder) end end)
+	local data = {
+		width = self.Config.Width,
+		height = self.Config.Height,
+		accent = {self.Config.Accent.R, self.Config.Accent.G, self.Config.Accent.B},
+		theme = self.Config.Theme,
+		language = self.Config.Language,
+		effects = self.Config.Effects,
+		title = self.Config.Title,
+		flags = self.Flags,
+	}
+	local ok = safe(function()
+		writefile(folder.."/"..name..".json", HttpService:JSONEncode(data))
+	end)
+	if ok then self:Notify("✓ Config saved: "..name, self.Theme.Good) end
+	return ok
+end
+
+function ToolxUI:LoadConfig(name)
+	local folder = self.Config.ConfigFolder
+	local path = folder.."/"..name..".json"
+	if not isfile(path) then
+		self:Notify("✗ Config not found: "..name, self.Theme.Danger)
+		return false
+	end
+	local ok, data = safe(function()
+		return HttpService:JSONDecode(readfile(path))
+	end)
+	if not ok or not data then return false end
+	self.Config.Width = data.width or self.Config.Width
+	self.Config.Height = data.height or self.Config.Height
+	if data.accent then
+		self:SetAccent(Color3.fromRGB(data.accent[1]*255, data.accent[2]*255, data.accent[3]*255))
+	end
+	if data.theme then self:SetTheme(data.theme) end
+	if data.language then self.Config.Language = data.language end
+	if data.effects then self.Config.Effects = data.effects end
+	if data.flags then self.Flags = data.flags end
+	self:SetSize(self.Config.Width, self.Config.Height)
+	if data.title then self:SetTitle(data.title) end
+	self:Notify("✓ Config loaded: "..name, self.Theme.Good)
+	return true
+end
+
+function ToolxUI:DeleteConfig(name)
+	local folder = self.Config.ConfigFolder
+	local path = folder.."/"..name..".json"
+	if isfile(path) then
+		safe(function() delfile(path) end)
+		self:Notify("✓ Config deleted: "..name, self.Theme.Warn)
+		return true
+	end
+	return false
+end
+
+function ToolxUI:ListConfigs()
+	local folder = self.Config.ConfigFolder
+	local out = {}
+	safe(function()
+		if isfolder(folder) then
+			for _, f in ipairs(listfiles(folder)) do
+				local name = f:match("([^/\\]+)%.json$")
+				if name then table.insert(out, name) end
+			end
+		end
+	end)
+	return out
+end
+
+-- Flags (shared state)
+function ToolxUI:SetFlag(key, value)
+	self.Flags[key] = value
+end
+function ToolxUI:GetFlag(key)
+	return self.Flags[key]
+end
+
+-- Keybind global
+function ToolxUI:BindKey(keyCode, callback)
+	local conn = UIS.InputBegan:Connect(function(i, gp)
+		if gp then return end
+		if i.KeyCode == keyCode then safe(callback) end
+	end)
+	table.insert(self.Keybinds, conn)
+	return conn
+end
+
+-- Language setter
+function ToolxUI:SetLanguage(lang)
+	self.Config.Language = lang
+end
+
+-- Debug logger
+function ToolxUI:Log(...)
+	if self.Config.Debug then
+		print("[ToolxUI]", ...)
+	end
+end
+
+-- ================== KEY SYSTEM ==================
+function ToolxUI:_buildKeySystem()
+	local g = Instance.new("ScreenGui")
+	g.Name = "ToolxUI_Key"
+	g.ResetOnSpawn = false
+	g.IgnoreGuiInset = true
+	g.DisplayOrder = 1001
+	g.Parent = self.Parent
+	self.KeyGui = g
+	
+	local panel = Instance.new("Frame", g)
+	panel.Size = UDim2.new(0, 280, 0, 220)
+	panel.Position = UDim2.new(0.5, -140, 0.5, -110)
+	panel.BackgroundColor3 = Color3.fromRGB(10,10,10)
+	panel.BorderSizePixel = 0
+	Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 4)
+	
+	local shine = Instance.new("Frame", panel)
+	shine.Size = UDim2.new(1,0,1,0)
+	shine.BackgroundColor3 = Color3.fromRGB(255,255,255)
+	shine.BackgroundTransparency = 0.85
+	shine.BorderSizePixel = 0
+	Instance.new("UICorner", shine).CornerRadius = UDim.new(0, 4)
+	local sg = Instance.new("UIGradient", shine)
+	sg.Transparency = NumberSequence.new{
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.5, 0.25),
+		NumberSequenceKeypoint.new(1, 1)
+	}
+	sg.Rotation = 30
+	addShine(sg, 0.014)
+	
+	local st = Instance.new("UIStroke", panel)
+	st.Thickness = 2
+	local stg = Instance.new("UIGradient", st)
+	stg.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, self.Config.Accent),
+		ColorSequenceKeypoint.new(0.5, brighten(self.Config.Accent, 70)),
+		ColorSequenceKeypoint.new(1, self.Config.Accent)
+	}
+	addSpin(stg, 0.8, "Grad")
+	
+	local bg = Instance.new("UIGradient", panel)
+	bg.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, darken(self.Config.Accent, 200)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(8,8,8)),
+		ColorSequenceKeypoint.new(1, darken(self.Config.Accent, 200))
+	}
+	bg.Rotation = 45
+	addSpin(bg, 0.8, "Grad")
+	
+	local title = Instance.new("TextLabel", panel)
+	title.Size = UDim2.new(1, -10, 0, 34)
+	title.Position = UDim2.new(0, 5, 0, 8)
+	title.BackgroundTransparency = 1
+	title.Text = "KEY SYSTEM"
+	title.TextColor3 = self.Config.Accent
+	title.TextSize = 22
+	setFont(title, FONTS.Title)
+	
+	local sub = Instance.new("TextLabel", panel)
+	sub.Size = UDim2.new(1, -10, 0, 18)
+	sub.Position = UDim2.new(0, 5, 0, 42)
+	sub.BackgroundTransparency = 1
+	sub.Text = self.Config.Title
+	sub.TextColor3 = Color3.fromRGB(255,160,160)
+	sub.TextSize = 14
+	setFont(sub, FONTS.Body)
+	
+	local box = Instance.new("TextBox", panel)
+	box.Size = UDim2.new(1, -20, 0, 38)
+	box.Position = UDim2.new(0, 10, 0, 70)
+	box.BackgroundColor3 = Color3.fromRGB(22,8,8)
+	box.BorderSizePixel = 0
+	box.PlaceholderText = "Enter Key..."
+	box.PlaceholderColor3 = Color3.fromRGB(150,80,80)
+	box.Text = ""
+	box.TextColor3 = Color3.fromRGB(255,220,220)
+	box.TextSize = 16
+	setFont(box, FONTS.Bold)
+	box.ClearTextOnFocus = false
+	Instance.new("UICorner", box).CornerRadius = UDim.new(0, 4)
+	local boxStroke = Instance.new("UIStroke", box)
+	boxStroke.Color = Color3.fromRGB(180,40,40)
+	boxStroke.Thickness = 1.5
+	
+	local submit = Instance.new("TextButton", panel)
+	submit.Size = UDim2.new(1, -20, 0, 36)
+	submit.Position = UDim2.new(0, 10, 0, 116)
+	submit.BackgroundColor3 = self.Config.Accent
+	submit.BorderSizePixel = 0
+	submit.Text = "SUBMIT"
+	submit.TextColor3 = Color3.new(1,1,1)
+	submit.TextSize = 15
+	setFont(submit, FONTS.Title)
+	submit.AutoButtonColor = false
+	Instance.new("UICorner", submit).CornerRadius = UDim.new(0, 4)
+	
+	local hint = Instance.new("TextButton", panel)
+	hint.Size = UDim2.new(1, -20, 0, 30)
+	hint.Position = UDim2.new(0, 10, 0, 158)
+	hint.BackgroundColor3 = Color3.fromRGB(40,15,15)
+	hint.BorderSizePixel = 0
+	hint.Text = "SHOW HINT"
+	hint.TextColor3 = Color3.fromRGB(255,200,120)
+	hint.TextSize = 13
+	setFont(hint, FONTS.Bold)
+	hint.AutoButtonColor = false
+	Instance.new("UICorner", hint).CornerRadius = UDim.new(0, 4)
+	
+	local hintLbl = Instance.new("TextLabel", panel)
+	hintLbl.Size = UDim2.new(1, -20, 0, 20)
+	hintLbl.Position = UDim2.new(0, 10, 0, 192)
+	hintLbl.BackgroundTransparency = 1
+	hintLbl.Text = ""
+	hintLbl.TextColor3 = Color3.fromRGB(255,220,120)
+	hintLbl.TextSize = 11
+	setFont(hintLbl, FONTS.Reg)
+	hintLbl.TextTransparency = 1
+	
+	hint.MouseButton1Click:Connect(function()
+		self:PlayClick(1.4)
+		hintLbl.Text = self.Config.KeyHint
+		TweenService:Create(hintLbl, TweenInfo.new(0.25), {TextTransparency = 0}):Play()
+	end)
+	
+	self:FireFlames(panel, 3)
+	self.KeySystemPanel = panel
+	
+	local function unlock()
+		self:FrameParticles(panel, "out", 40, 90)
+		self:PlayClick(0.6)
+		task.wait(0.4)
+		g:Destroy()
+		self.KeyGui = nil
+	end
+	
+	submit.MouseButton1Click:Connect(function()
+		self:PlayClick()
+		if box.Text == self.Config.Key then
+			boxStroke.Color = Color3.fromRGB(60,220,60)
+			self:Notify("✓ Access Granted!", self.Theme.Good)
+			self:ShakeFrame(panel, 4, 0.2)
+			self:FireFlames(panel, 1.5)
+			task.wait(0.6)
+			unlock()
+		else
+			boxStroke.Color = Color3.fromRGB(255,40,40)
+			self:PlayError()
+			self:Notify("✗ Wrong Key!", self.Theme.Danger)
+			self:ShakeFrame(panel, 8, 0.3)
+			task.wait(0.5)
+			boxStroke.Color = Color3.fromRGB(180,40,40)
+		end
+	end)
+end
+
+-- ================== SETTINGS PANEL ==================
+function ToolxUI:BuildSettingsPanel()
+	-- Simple settings panel open via gear
+	local panel = Instance.new("Frame", self.Gui)
+	panel.Size = UDim2.new(0, 260, 0, 330)
+	panel.Position = UDim2.new(0.5, -130, 1.5, 0)
+	panel.BackgroundColor3 = Color3.fromRGB(10,10,10)
+	panel.BorderSizePixel = 0
+	panel.ClipsDescendants = true
+	panel.Visible = false
+	Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 4)
+	
+	local st = Instance.new("UIStroke", panel)
+	st.Thickness = 2
+	local stg = Instance.new("UIGradient", st)
+	stg.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, self.Config.Accent),
+		ColorSequenceKeypoint.new(0.5, brighten(self.Config.Accent, 70)),
+		ColorSequenceKeypoint.new(1, self.Config.Accent)
+	}
+	addSpin(stg, 0.8, "Grad")
+	
+	local bg = Instance.new("UIGradient", panel)
+	bg.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, darken(self.Config.Accent, 200)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(8,8,8)),
+		ColorSequenceKeypoint.new(1, darken(self.Config.Accent, 200))
+	}
+	bg.Rotation = 45
+	addSpin(bg, 0.8, "Grad")
+	
+	local t = Instance.new("TextLabel", panel)
+	t.Size = UDim2.new(1, -40, 0, 26)
+	t.Position = UDim2.new(0, 8, 0, 2)
+	t.BackgroundTransparency = 1
+	t.Text = "Settings"
+	t.TextColor3 = self.Theme.Text
+	t.TextSize = 16
+	setFont(t, FONTS.Title)
+	t.TextXAlignment = Enum.TextXAlignment.Left
+	
+	local back = Instance.new("ImageButton", panel)
+	back.Size = UDim2.new(0, 28, 0, 26)
+	back.Position = UDim2.new(1, -32, 0, 2)
+	back.BackgroundColor3 = Color3.fromRGB(60,15,15)
+	back.BorderSizePixel = 0
+	back.Image = ICONS.Back
+	back.ImageColor3 = self.Config.Accent
+	back.AutoButtonColor = false
+	Instance.new("UICorner", back).CornerRadius = UDim.new(0, 4)
+	
+	local open = false
+	local settingsOpen = false
+	self.GearBtn.MouseButton1Click:Connect(function()
+		if settingsOpen then return end
+		self:PlayClick()
+		local spin = TweenService:Create(self.GearBtn, Ease.QuintInOut, {Rotation = 360})
+		spin:Play()
+		spin.Completed:Wait()
+		self.GearBtn.Rotation = 0
+		settingsOpen = true
+		self.Main.Visible = false
+		panel.Position = self.Main.Position
+		panel.Visible = true
+		self:FrameParticles(panel, "in", 45, 90)
+		self:Shockwave(self.GearBtn, 30, self.Config.Accent, darken(self.Config.Accent, 120), 0.7)
+		self:ShakeFrame(panel, 5, 0.25)
+	end)
+	back.MouseButton1Click:Connect(function()
+		if not settingsOpen then return end
+		self:PlayClick()
+		back.Rotation = 0
+		TweenService:Create(back, Ease.QuintInOut, {Rotation = -360}):Play()
+		self:FrameParticles(panel, "out", 45, 90)
+		self:ShakeFrame(panel, 6, 0.25)
+		self:Shockwave(back, 25, self.Config.Accent, darken(self.Config.Accent, 120), 0.65)
+		task.wait(0.35)
+		panel.Visible = false
+		self.Main.Visible = true
+		self.GearBtn.Rotation = 360
+		TweenService:Create(self.GearBtn, Ease.QuintInOut, {Rotation = 0}):Play()
+		self:FrameParticles(self.Main, "in", 25, 60)
+		settingsOpen = false
+	end)
+	
+	-- Content: simple effects toggles
+	local y = 40
+	local keys = {"Sound", "Particles", "Shockwave", "Fire", "Shine", "Spin"}
+	for _, k in ipairs(keys) do
+		local b = Instance.new("TextButton", panel)
+		b.Size = UDim2.new(1, -20, 0, 26)
+		b.Position = UDim2.new(0, 10, 0, y)
+		b.BackgroundColor3 = self.Config.Effects[k] and self.Config.Accent or Color3.fromRGB(40,12,12)
+		b.BorderSizePixel = 0
+		b.Text = k..": "..(self.Config.Effects[k] and "ON" or "OFF")
+		b.TextColor3 = Color3.new(1,1,1)
+		b.TextSize = 12
+		setFont(b, FONTS.Bold)
+		b.AutoButtonColor = false
+		Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+		b.MouseButton1Click:Connect(function()
+			self:PlayClick()
+			self.Config.Effects[k] = not self.Config.Effects[k]
+			local on = self.Config.Effects[k]
+			b.BackgroundColor3 = on and self.Config.Accent or Color3.fromRGB(40,12,12)
+			b.Text = k..": "..(on and "ON" or "OFF")
+		end)
+		y += 30
+	end
+	self.SettingsPanel = panel
+end
+
+-- ================== RETURN ==================
+return ToolxUI
