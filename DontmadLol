@@ -1,0 +1,2235 @@
+--PLS BRO BC ITS FROM OBFUSTCATE
+local LMG2L = {}
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local modules = {}
+local cache = {}
+local function drequire(name)
+	if cache[name] ~= nil then return cache[name] end
+	local module_func = modules[name]
+	if not module_func then error("module '" .. name .. "' not found in bundle", 2) end
+	cache[name] = true
+	local result = module_func()
+	if result ~= nil then cache[name] = result end
+	return cache[name]
+end
+modules["PNGLib\\Chunks\\bKGD.lua"] = function()
+	local function bKGD(file, chunk)
+		local data = chunk.Data
+		local bitDepth = file.BitDepth
+		local colorType = file.ColorType
+		bitDepth = (2 ^ bitDepth) - 1
+		if colorType == 3 then
+			local index = data:ReadByte()
+			file.BackgroundColor = file.Palette[index]
+		elseif colorType == 0 or colorType == 4 then
+			local gray = data:ReadUInt16() / bitDepth
+			file.BackgroundColor = Color3.fromHSV(0, 0, gray)
+		elseif colorType == 2 or colorType == 6 then
+			local r = data:ReadUInt16() / bitDepth
+			local g = data:ReadUInt16() / bitDepth
+			local b = data:ReadUInt16() / bitDepth
+			file.BackgroundColor = Color3.new(r, g, b)
+		end
+	end
+	return bKGD
+end
+modules["PNGLib\\Chunks\\cHRM.lua"] = function()
+	local colors = {"White", "Red", "Green", "Blue"}
+	local function cHRM(file, chunk)
+		local chrome = {}
+		local data = chunk.Data
+		for i = 1, 4 do
+			local color = colors[i]
+			chrome[color] = { [1] = data:ReadUInt32() / 10e4; [2] = data:ReadUInt32() / 10e4; }
+		end
+		file.Chromaticity = chrome
+	end
+	return cHRM
+end
+modules["PNGLib\\Chunks\\gAMA.lua"] = function()
+	local function gAMA(file, chunk)
+		local data = chunk.Data
+		local value = data:ReadUInt32()
+		file.Gamma = value / 10e4
+	end
+	return gAMA
+end
+modules["PNGLib\\Chunks\\IDAT.lua"] = function()
+	local function IDAT(file, chunk)
+		local crc = chunk.CRC
+		local hash = file.Hash or 0
+		local data = chunk.Data
+		local buffer = data.Buffer
+		file.Hash = bit32.bxor(hash, crc)
+		file.ZlibStream = file.ZlibStream .. buffer
+	end
+	return IDAT
+end
+modules["PNGLib\\Chunks\\IEND.lua"] = function()
+	local function IEND(file) file.Reading = nil end
+	return IEND
+end
+modules["PNGLib\\Chunks\\IHDR.lua"] = function()
+	local function IHDR(file, chunk)
+		local data = chunk.Data
+		file.Width = data:ReadInt32()
+		file.Height = data:ReadInt32()
+		file.BitDepth = data:ReadByte()
+		file.ColorType = data:ReadByte()
+		file.Methods = {
+			Compression = data:ReadByte();
+			Filtering = data:ReadByte();
+			Interlace = data:ReadByte();
+		}
+	end
+	return IHDR
+end
+modules["PNGLib\\Chunks\\PLTE.lua"] = function()
+	local function PLTE(file, chunk)
+		if not file.Palette then file.Palette = {} end
+		local data = chunk.Data
+		local palette = data:ReadAllBytes()
+		if #palette % 3 ~= 0 then error("PNG - Invalid PLTE chunk.") end
+		for i = 1, #palette, 3 do
+			local r = palette[i]
+			local g = palette[i + 1]
+			local b = palette[i + 2]
+			local color = Color3.fromRGB(r, g, b)
+			local index = #file.Palette + 1
+			file.Palette[index] = color
+		end
+	end
+	return PLTE
+end
+modules["PNGLib\\Chunks\\sRGB.lua"] = function()
+	local function sRGB(file, chunk)
+		local data = chunk.Data
+		file.RenderIntent = data:ReadByte()
+	end
+	return sRGB
+end
+modules["PNGLib\\Chunks\\tEXt.lua"] = function()
+	local function tEXt(file, chunk)
+		local data = chunk.Data
+		local key, value = "", ""
+		for byte in data:IterateBytes() do
+			local char = string.char(byte)
+			if char == '\0' then
+				key = value
+				value = ""
+			else
+				value = value .. char
+			end
+		end
+		file.Metadata[key] = value
+	end
+	return tEXt
+end
+modules["PNGLib\\Chunks\\tIME.lua"] = function()
+	local function tIME(file, chunk)
+		local data = chunk.Data
+		local timeStamp = {
+			Year = data:ReadUInt16();
+			Month = data:ReadByte();
+			Day = data:ReadByte();
+			Hour = data:ReadByte();
+			Minute = data:ReadByte();
+			Second = data:ReadByte();
+		}
+		file.TimeStamp = timeStamp
+	end
+	return tIME
+end
+modules["PNGLib\\Chunks\\tRNS.lua"] = function()
+	local function tRNS(file, chunk)
+		local data = chunk.Data
+		local bitDepth = file.BitDepth
+		local colorType = file.ColorType
+		bitDepth = (2 ^ bitDepth) - 1
+		if colorType == 3 then
+			local palette = file.Palette
+			local alphaMap = {}
+			for i = 1, #palette do
+				local alpha = data:ReadByte()
+				if not alpha then alpha = 255 end
+				alphaMap[i] = alpha
+			end
+			file.AlphaData = alphaMap
+		elseif colorType == 0 then
+			local grayAlpha = data:ReadUInt16()
+			file.Alpha = grayAlpha / bitDepth
+		elseif colorType == 2 then
+			local r = data:ReadUInt16() / bitDepth
+			local g = data:ReadUInt16() / bitDepth
+			local b = data:ReadUInt16() / bitDepth
+			file.Alpha = Color3.new(r, g, b)
+		else
+			error("PNG - Invalid tRNS chunk")
+		end
+	end
+	return tRNS
+end
+modules["PNGLib\\Modules\\BinaryReader.lua"] = function()
+	local BinaryReader = {}
+	BinaryReader.__index = BinaryReader
+	function BinaryReader.new(buffer)
+		local reader = { Position = 1; Buffer = buffer; Length = #buffer; }
+		return setmetatable(reader, BinaryReader)
+	end
+	function BinaryReader:ReadByte()
+		local buffer = self.Buffer
+		local pos = self.Position
+		if pos <= self.Length then
+			local result = buffer:sub(pos, pos)
+			self.Position = pos + 1
+			return result:byte()
+		end
+	end
+	function BinaryReader:ReadBytes(count, asArray)
+		local values = {}
+		for i = 1, count do values[i] = self:ReadByte() end
+		if asArray then return values end
+		return unpack(values)
+	end
+	function BinaryReader:ReadAllBytes()
+		return self:ReadBytes(self.Length, true)
+	end
+	function BinaryReader:IterateBytes()
+		return function() return self:ReadByte() end
+	end
+	function BinaryReader:TwosComplementOf(value, numBits)
+		if value >= (2 ^ (numBits - 1)) then value = value - (2 ^ numBits) end
+		return value
+	end
+	function BinaryReader:ReadUInt16()
+		local upper, lower = self:ReadBytes(2)
+		return (upper * 256) + lower
+	end
+	function BinaryReader:ReadInt16()
+		local unsigned = self:ReadUInt16()
+		return self:TwosComplementOf(unsigned, 16)
+	end
+	function BinaryReader:ReadUInt32()
+		local upper = self:ReadUInt16()
+		local lower = self:ReadUInt16()
+		return (upper * 65536) + lower
+	end
+	function BinaryReader:ReadInt32()
+		local unsigned = self:ReadUInt32()
+		return self:TwosComplementOf(unsigned, 32)
+	end
+	function BinaryReader:ReadString(length)
+		if length == nil then length = self:ReadByte() end
+		local pos = self.Position
+		local nextPos = math.min(self.Length, pos + length)
+		local result = self.Buffer:sub(pos, nextPos - 1)
+		self.Position = nextPos
+		return result
+	end
+	function BinaryReader:ForkReader(length)
+		local chunk = self:ReadString(length)
+		return BinaryReader.new(chunk)
+	end
+	return BinaryReader
+end
+modules["PNGLib\\Modules\\Deflate.lua"] = function()
+	local Deflate = {}
+	local band = bit32.band
+	local lshift = bit32.lshift
+	local rshift = bit32.rshift
+	local BTYPE_NO_COMPRESSION = 0
+	local BTYPE_FIXED_HUFFMAN = 1
+	local BTYPE_DYNAMIC_HUFFMAN = 2
+	local lens = { [0] = 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258 }
+	local lext = { [0] = 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0 }
+	local dists = { [0] = 1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577 }
+	local dext = { [0] = 0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13 }
+	local order = { 16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15 }
+	local fixedLit = {0, 8, 144, 9, 256, 7, 280, 8, 288}
+	local fixedDist = {0, 5, 32}
+	local function createState(bitStream)
+		local state = { Output = bitStream; Window = {}; Pos = 1; }
+		return state
+	end
+	local function write(state, byte)
+		local pos = state.Pos
+		state.Output(byte)
+		state.Window[pos] = byte
+		state.Pos = pos % 32768 + 1
+	end
+	local function memoize(fn)
+		local meta = {}
+		local memoizer = setmetatable({}, meta)
+		function meta:__index(k)
+			local v = fn(k)
+			memoizer[k] = v
+			return v
+		end
+		return memoizer
+	end
+	local pow2 = memoize(function(n) return 2 ^ n end)
+	local isBitStream = setmetatable({}, { __mode = 'k' })
+	local function createBitStream(reader)
+		local buffer = 0
+		local bitsLeft = 0
+		local stream = {}
+		isBitStream[stream] = true
+		function stream:GetBitsLeft() return bitsLeft end
+		function stream:Read(count)
+			count = count or 1
+			while bitsLeft < count do
+				local byte = reader:ReadByte()
+				if not byte then return end
+				buffer = buffer + lshift(byte, bitsLeft)
+				bitsLeft = bitsLeft + 8
+			end
+			local bits
+			if count == 0 then
+				bits = 0
+			elseif count == 32 then
+				bits = buffer
+				buffer = 0
+			else
+				bits = band(buffer, rshift(2^32 - 1, 32 - count))
+				buffer = rshift(buffer, count)
+			end
+			bitsLeft = bitsLeft - count
+			return bits
+		end
+		return stream
+	end
+	local function getBitStream(obj)
+		if isBitStream[obj] then return obj end
+		return createBitStream(obj)
+	end
+	local function sortHuffman(a, b)
+		return a.NumBits == b.NumBits and a.Value < b.Value or a.NumBits < b.NumBits
+	end
+	local function msb(bits, numBits)
+		local res = 0
+		for i = 1, numBits do
+			res = lshift(res, 1) + band(bits, 1)
+			bits = rshift(bits, 1)
+		end
+		return res
+	end
+	local function createHuffmanTable(init, isFull)
+		local hTable = {}
+		if isFull then
+			for val, numBits in pairs(init) do
+				if numBits ~= 0 then
+					hTable[#hTable + 1] = { Value = val; NumBits = numBits; }
+				end
+			end
+		else
+			for i = 1, #init - 2, 2 do
+				local firstVal = init[i]
+				local numBits = init[i + 1]
+				local nextVal = init[i + 2]
+				if numBits ~= 0 then
+					for val = firstVal, nextVal - 1 do
+						hTable[#hTable + 1] = { Value = val; NumBits = numBits; }
+					end
+				end
+			end
+		end
+		table.sort(hTable, sortHuffman)
+		local code = 1
+		local numBits = 0
+		for i, slide in ipairs(hTable) do
+			if slide.NumBits ~= numBits then
+				code = code * pow2[slide.NumBits - numBits]
+				numBits = slide.NumBits
+			end
+			slide.Code = code
+			code = code + 1
+		end
+		local minBits = math.huge
+		local look = {}
+		for i, slide in ipairs(hTable) do
+			minBits = math.min(minBits, slide.NumBits)
+			look[slide.Code] = slide.Value
+		end
+		local firstCode = memoize(function(bits) return pow2[minBits] + msb(bits, minBits) end)
+		function hTable:Read(bitStream)
+			local code = 1
+			local numBits = 0
+			while true do
+				if numBits == 0 then
+					local index = bitStream:Read(minBits)
+					numBits = numBits + minBits
+					code = firstCode[index]
+				else
+					local bit = bitStream:Read()
+					numBits = numBits + 1
+					code = code * 2 + bit
+				end
+				local val = look[code]
+				if val then return val end
+			end
+		end
+		return hTable
+	end
+	local function parseZlibHeader(bitStream)
+		local cm = bitStream:Read(4)
+		local cinfo = bitStream:Read(4)
+		local fcheck = bitStream:Read(5)
+		local fdict = bitStream:Read(1)
+		local flevel = bitStream:Read(2)
+		local cmf = cinfo * 16 + cm
+		local flg = fcheck + fdict * 32 + flevel * 64
+		if cm ~= 8 then error("unrecognized zlib compression method: " .. cm) end
+		if cinfo > 7 then error("invalid zlib window size: cinfo=" .. cinfo) end
+		local windowSize = 2 ^ (cinfo + 8)
+		if (cmf * 256 + flg) % 31 ~= 0 then error("invalid zlib header (bad fcheck sum)") end
+		if fdict == 1 then error("FIX:TODO - FDICT not currently implemented") end
+		return windowSize
+	end
+	local function parseHuffmanTables(bitStream)
+		local numLits = bitStream:Read(5)
+		local numDists = bitStream:Read(5)
+		local numCodes = bitStream:Read(4)
+		local codeLens = {}
+		for i = 1, numCodes + 4 do
+			local index = order[i]
+			codeLens[index] = bitStream:Read(3)
+		end
+		codeLens = createHuffmanTable(codeLens, true)
+		local function decode(numCodes)
+			local init = {}
+			local numBits
+			local val = 0
+			while val < numCodes do
+				local codeLen = codeLens:Read(bitStream)
+				local numRepeats
+				if codeLen <= 15 then
+					numRepeats = 1
+					numBits = codeLen
+				elseif codeLen == 16 then
+					numRepeats = 3 + bitStream:Read(2)
+				elseif codeLen == 17 then
+					numRepeats = 3 + bitStream:Read(3)
+					numBits = 0
+				elseif codeLen == 18 then
+					numRepeats = 11 + bitStream:Read(7)
+					numBits = 0
+				end
+				for i = 1, numRepeats do
+					init[val] = numBits
+					val = val + 1
+				end
+			end
+			return createHuffmanTable(init, true)
+		end
+		local numLitCodes = numLits + 257
+		local numDistCodes = numDists + 1
+		local litTable = decode(numLitCodes)
+		local distTable = decode(numDistCodes)
+		return litTable, distTable
+	end
+	local function parseCompressedItem(bitStream, state, litTable, distTable)
+		local val = litTable:Read(bitStream)
+		if val < 256 then
+			write(state, val)
+		elseif val == 256 then
+			return true
+		else
+			local lenBase = lens[val - 257]
+			local numExtraBits = lext[val - 257]
+			local extraBits = bitStream:Read(numExtraBits)
+			local len = lenBase + extraBits
+			local distVal = distTable:Read(bitStream)
+			local distBase = dists[distVal]
+			local distNumExtraBits = dext[distVal]
+			local distExtraBits = bitStream:Read(distNumExtraBits)
+			local dist = distBase + distExtraBits
+			for i = 1, len do
+				local pos = (state.Pos - 1 - dist) % 32768 + 1
+				local byte = assert(state.Window[pos], "invalid distance")
+				write(state, byte)
+			end
+		end
+		return false
+	end
+	local function parseBlock(bitStream, state)
+		local bFinal = bitStream:Read(1)
+		local bType = bitStream:Read(2)
+		if bType == BTYPE_NO_COMPRESSION then
+			local left = bitStream:GetBitsLeft()
+			bitStream:Read(left)
+			local len = bitStream:Read(16)
+			local nlen = bitStream:Read(16)
+			for i = 1, len do
+				local byte = bitStream:Read(8)
+				write(state, byte)
+			end
+		elseif bType == BTYPE_FIXED_HUFFMAN or bType == BTYPE_DYNAMIC_HUFFMAN then
+			local litTable, distTable
+			if bType == BTYPE_DYNAMIC_HUFFMAN then
+				litTable, distTable = parseHuffmanTables(bitStream)
+			else
+				litTable = createHuffmanTable(fixedLit)
+				distTable = createHuffmanTable(fixedDist)
+			end
+			repeat until parseCompressedItem(bitStream, state, litTable, distTable)
+		else
+			error("unrecognized compression type")
+		end
+		return bFinal ~= 0
+	end
+	function Deflate:Inflate(io)
+		local state = createState(io.Output)
+		local bitStream = getBitStream(io.Input)
+		repeat until parseBlock(bitStream, state)
+	end
+	function Deflate:InflateZlib(io)
+		local bitStream = getBitStream(io.Input)
+		local windowSize = parseZlibHeader(bitStream)
+		self:Inflate { Input = bitStream; Output = io.Output; }
+		local bitsLeft = bitStream:GetBitsLeft()
+		bitStream:Read(bitsLeft)
+	end
+	return Deflate
+end
+modules["PNGLib\\Modules\\Unfilter.lua"] = function()
+	local Unfilter = {}
+	function Unfilter:None(scanline, pixels, bpp, row)
+		for i = 1, #scanline do pixels[row][i] = scanline[i] end
+	end
+	function Unfilter:Sub(scanline, pixels, bpp, row)
+		for i = 1, bpp do pixels[row][i] = scanline[i] end
+		for i = bpp + 1, #scanline do
+			local x = scanline[i]
+			local a = pixels[row][i - bpp]
+			pixels[row][i] = bit32.band(x + a, 0xFF)
+		end
+	end
+	function Unfilter:Up(scanline, pixels, bpp, row)
+		if row > 1 then
+			local upperRow = pixels[row - 1]
+			for i = 1, #scanline do
+				local x = scanline[i]
+				local b = upperRow[i]
+				pixels[row][i] = bit32.band(x + b, 0xFF)
+			end
+		else
+			self:None(scanline, pixels, bpp, row)
+		end
+	end
+	function Unfilter:Average(scanline, pixels, bpp, row)
+		if row > 1 then
+			for i = 1, bpp do
+				local x = scanline[i]
+				local b = pixels[row - 1][i]
+				b = bit32.rshift(b, 1)
+				pixels[row][i] = bit32.band(x + b, 0xFF)
+			end
+			for i = bpp + 1, #scanline do
+				local x = scanline[i]
+				local b = pixels[row - 1][i]
+				local a = pixels[row][i - bpp]
+				local ab = bit32.rshift(a + b, 1)
+				pixels[row][i] = bit32.band(x + ab, 0xFF)
+			end
+		else
+			for i = 1, bpp do pixels[row][i] = scanline[i] end
+			for i = bpp + 1, #scanline do
+				local x = scanline[i]
+				local b = pixels[row - 1][i]
+				b = bit32.rshift(b, 1)
+				pixels[row][i] = bit32.band(x + b, 0xFF)
+			end
+		end
+	end
+	function Unfilter:Paeth(scanline, pixels, bpp, row)
+		if row > 1 then
+			local pr
+			for i = 1, bpp do
+				local x = scanline[i]
+				local b = pixels[row - 1][i]
+				pixels[row][i] = bit32.band(x + b, 0xFF)
+			end
+			for i = bpp + 1, #scanline do
+				local a = pixels[row][i - bpp]
+				local b = pixels[row - 1][i]
+				local c = pixels[row - 1][i - bpp]
+				local x = scanline[i]
+				local p = a + b - c
+				local pa = math.abs(p - a)
+				local pb = math.abs(p - b)
+				local pc = math.abs(p - c)
+				if pa <= pb and pa <= pc then pr = a
+				elseif pb <= pc then pr = b
+				else pr = c end
+				pixels[row][i] = bit32.band(x + pr, 0xFF)
+			end
+		else
+			self:Sub(scanline, pixels, bpp, row)
+		end
+	end
+	return Unfilter
+end
+modules["modules.standard.png"] = function()
+	local sub, format, split, loadstring, spawn = string.sub, string.format, string.split, loadstring, task.spawn
+	local PNG = {}
+	PNG.__index = PNG
+	local chunks = {}
+	local modules = {}
+	local chunk_modules = { "PNGLib\\Chunks\\bKGD.lua", "PNGLib\\Chunks\\cHRM.lua", "PNGLib\\Chunks\\gAMA.lua", "PNGLib\\Chunks\\IDAT.lua", "PNGLib\\Chunks\\IEND.lua", "PNGLib\\Chunks\\IHDR.lua", "PNGLib\\Chunks\\PLTE.lua", "PNGLib\\Chunks\\sRGB.lua", "PNGLib\\Chunks\\tEXt.lua", "PNGLib\\Chunks\\tIME.lua", "PNGLib\\Chunks\\tRNS.lua" }
+	local module_modules = { "PNGLib\\Modules\\BinaryReader.lua", "PNGLib\\Modules\\Deflate.lua", "PNGLib\\Modules\\Unfilter.lua" }
+	function fetch(module_list)
+		local r = {}
+		for i, module_name in ipairs(module_list) do
+			local ChunkName = sub(split(module_name, "\\")[3], 1, #split(module_name, "\\")[3] - 4)
+			r[ChunkName] = drequire(module_name)
+		end
+		return r
+	end
+	for n, v in next, fetch(chunk_modules) do chunks[n] = v end
+	for n, v in next, fetch(module_modules) do modules[n] = v end
+	local Deflate = modules.Deflate
+	local Unfilter = modules.Unfilter
+	local BinaryReader = modules.BinaryReader
+	local function getBytesPerPixel(colorType)
+		if colorType == 0 or colorType == 3 then return 1
+		elseif colorType == 4 then return 2
+		elseif colorType == 2 then return 3
+		elseif colorType == 6 then return 4
+		else return 0 end
+	end
+	local function clampInt(value, min, max)
+		local num = tonumber(value) or 0
+		num = math.floor(num + .5)
+		return math.clamp(num, min, max)
+	end
+	local function indexBitmap(file, x, y)
+		local width = file.Width
+		local height = file.Height
+		x = clampInt(x, 1, width)
+		y = clampInt(y, 1, height)
+		local bitmap = file.Bitmap
+		local bpp = file.BytesPerPixel
+		local i0 = ((x - 1) * bpp) + 1
+		local i1 = i0 + bpp
+		return bitmap[y], i0, i1
+	end
+	function PNG:GetPixel(x, y)
+		local row, i0, i1 = indexBitmap(self, x, y)
+		local colorType = self.ColorType
+		local color, alpha do
+			if colorType == 0 then
+				local gray = unpack(row, i0, i1)
+				color = Color3.fromHSV(0, 0, gray)
+				alpha = 255
+			elseif colorType == 2 then
+				local r, g, b = unpack(row, i0, i1)
+				color = Color3.fromRGB(r, g, b)
+				alpha = 255
+			elseif colorType == 3 then
+				local palette = self.Palette
+				local alphaData = self.AlphaData
+				local index = unpack(row, i0, i1)
+				index = index + 1
+				if palette then color = palette[index] end
+				if alphaData then alpha = alphaData[index] end
+			elseif colorType == 4 then
+				local gray, a = unpack(row, i0, i1)
+				color = Color3.fromHSV(0, 0, gray)
+				alpha = a
+			elseif colorType == 6 then
+				local r, g, b, a = unpack(row, i0, i1)
+				color = Color3.fromRGB(r, g, b, a)
+				alpha = a
+			end
+		end
+		if not color then color = Color3.new() end
+		if not alpha then alpha = 255 end
+		return color, alpha
+	end
+	function PNG.new(buffer)
+		local reader = BinaryReader.new(buffer)
+		local file = { Chunks = {}; Metadata = {}; Reading = true; ZlibStream = ""; }
+		local header = reader:ReadString(8)
+		if header ~= "\137PNG\r\n\26\n" then error("PNG - Input data is not a PNG file.", 2) end
+		while file.Reading do
+			local length = reader:ReadInt32()
+			local chunkType = reader:ReadString(4)
+			local data, crc
+			if length > 0 then
+				data = reader:ForkReader(length)
+				crc = reader:ReadUInt32()
+			end
+			local chunk = { Length = length; Type = chunkType; Data = data; CRC = crc; }
+			local handler = chunks[chunkType]
+			if handler then handler(file, chunk) end
+			table.insert(file.Chunks, chunk)
+		end
+		local success, response = pcall(function()
+			local result = {}
+			local index = 0
+			Deflate:InflateZlib {
+				Input = BinaryReader.new(file.ZlibStream);
+				Output = function(byte)
+					index = index + 1
+					result[index] = string.char(byte)
+				end
+			}
+			return table.concat(result)
+		end)
+		if not success then error("PNG - Unable to unpack PNG data. " .. tostring(response), 2) end
+		local width = file.Width
+		local height = file.Height
+		local bitDepth = file.BitDepth
+		local colorType = file.ColorType
+		local buffer = BinaryReader.new(response)
+		file.ZlibStream = nil
+		local bitmap = {}
+		file.Bitmap = bitmap
+		local channels = getBytesPerPixel(colorType)
+		file.NumChannels = channels
+		local bpp = math.max(1, channels * (bitDepth / 8))
+		file.BytesPerPixel = bpp
+		for row = 1, height do
+			local filterType = buffer:ReadByte()
+			local scanline = buffer:ReadBytes(width * bpp, true)
+			bitmap[row] = {}
+			if filterType == 0 then Unfilter:None(scanline, bitmap, bpp, row)
+			elseif filterType == 1 then Unfilter:Sub(scanline, bitmap, bpp, row)
+			elseif filterType == 2 then Unfilter:Up(scanline, bitmap, bpp, row)
+			elseif filterType == 3 then Unfilter:Average(scanline, bitmap, bpp, row)
+			elseif filterType == 4 then Unfilter:Paeth(scanline, bitmap, bpp, row) end
+		end
+		return setmetatable(file, PNG)
+	end
+	return PNG
+end
+modules["modules.standard.jpeg.BitBuffer"] = function()
+	local BitBuffer = { Bytes = "", Size = 0, ByteIndex = 0, CurrentByte = 0, Bit = 0 }
+	BitBuffer.__index = BitBuffer
+	function BitBuffer.New(Data)
+		local Buffer = setmetatable({}, BitBuffer)
+		Buffer.Bytes = Data
+		Buffer.Size = #Buffer.Bytes
+		return Buffer
+	end
+	function BitBuffer:ReadBit()
+		if (self.Bit == 0) then
+			self.ByteIndex = self.ByteIndex + 1
+			self.Bit = 0
+			local NextByte = string.unpack(">I1", self.Bytes, self.ByteIndex)
+			if (NextByte == 0x00 and self.CurrentByte == 0xFF) then
+				self.ByteIndex = self.ByteIndex + 1
+				NextByte = string.unpack(">I1", self.Bytes, self.ByteIndex)
+			elseif (self.CurrentByte == 0xFF) then
+				error("Unexpected marker in entropy stream: "..tostring(self.CurrentByte), 1)
+			end
+			self.CurrentByte = NextByte
+		end
+		local Bit = bit32.band(bit32.rshift(self.CurrentByte, 7 - self.Bit), 1)
+		self.Bit = bit32.band(self.Bit + 1, 0x7)
+		return Bit
+	end
+	function BitBuffer:ReadBits(NumBits)
+		local Bits = 0
+		for i = 1, NumBits, 1 do Bits = bit32.bor((bit32.lshift(Bits, 1)), self:ReadBit()) end
+		return Bits
+	end
+	function BitBuffer:ReadBytes(NumBytes)
+		if (self.Bit ~= 0) then self:Align() end
+		local Bytes = 0
+		for i = 1, NumBytes, 1 do
+			self.ByteIndex = self.ByteIndex + 1
+			self.CurrentByte = string.unpack(">I1", self.Bytes, self.ByteIndex)
+			Bytes = bit32.bor(bit32.lshift(Bytes, 8), self.CurrentByte)
+		end
+		return Bytes
+	end
+	function BitBuffer:Align() self.Bit = 0 end
+	function BitBuffer:IsEmpty() return self.Size <= self.ByteIndex end
+	return BitBuffer
+end
+modules["modules.standard.jpeg.HuffmanTree"] = function()
+	local HuffmanTree = { Root = {} }
+	HuffmanTree.__index = HuffmanTree
+	function HuffmanTree.New()
+		local NewTree = setmetatable({}, HuffmanTree)
+		NewTree.Root = {}
+		return NewTree
+	end
+	function HuffmanTree:AddCode(Code, Bits, Value)
+		local CurrentTable = self.Root
+		for i = 1, Bits, 1 do
+			local Bit = bit32.band(bit32.rshift(Code, Bits - i), 1)
+			if (CurrentTable[Bit] == nil) then CurrentTable[Bit] = {} end
+			CurrentTable = CurrentTable[Bit]
+		end
+		if (CurrentTable[0] ~= nil or CurrentTable[1] ~= nil or CurrentTable.Value ~= nil) then
+			error("Attempt to add code that is a prefix of an already existing code", 1)
+		end
+		CurrentTable.Value = Value
+	end
+	function HuffmanTree:Index(Code, Bits)
+		local CurrentTable = self.Root
+		for i = 1, Bits, 1 do
+			CurrentTable = CurrentTable[bit32.band(bit32.rshift(Code, Bits - i), 1)]
+		end
+		return CurrentTable.Value
+	end
+	return HuffmanTree
+end
+modules["modules.standard.jpeg.IDCT"] = function()
+	local c1 = math.cos(math.pi / 16) / 2
+	local c2 = math.cos(2 * math.pi / 16) / 2
+	local c3 = math.cos(3 * math.pi / 16) / 2
+	local c4 = math.cos(4 * math.pi / 16) / 2
+	local c5 = math.cos(5 * math.pi / 16) / 2
+	local c6 = math.cos(6 * math.pi / 16) / 2
+	local c7 = math.cos(7 * math.pi / 16) / 2
+	function IDCT(Data)
+		for j = 1, 8, 1 do
+			local k11 = (Data[j] + Data[32 + j]) * c4 + c2 * Data[16 + j] + c6 * Data[48 + j]
+			local k21 = (Data[j] - Data[32 + j]) * c4 + c6 * Data[16 + j] - c2 * Data[48 + j]
+			local k31 = (Data[j] - Data[32 + j]) * c4 - c6 * Data[16 + j] + c2 * Data[48 + j]
+			local k41 = (Data[j] + Data[32 + j]) * c4 - c2 * Data[16 + j] - c6 * Data[48 + j]
+			local k12 = c1 * Data[8 + j] + c3 * Data[24 + j] + c5 * Data[40 + j] + c7 * Data[56 + j]
+			local k22 = c3 * Data[8 + j] - c7 * Data[24 + j] - c1 * Data[40 + j] - c5 * Data[56 + j]
+			local k32 = c5 * Data[8 + j] - c1 * Data[24 + j] + c7 * Data[40 + j] + c3 * Data[56 + j]
+			local k42 = c7 * Data[8 + j] - c5 * Data[24 + j] + c3 * Data[40 + j] - c1 * Data[56 + j]
+			Data[j] = k11 + k12
+			Data[8 + j] = k21 + k22
+			Data[16 + j] = k31 + k32
+			Data[24 + j] = k41 + k42
+			Data[56 + j] = k11 - k12
+			Data[48 + j] = k21 - k22
+			Data[40 + j] = k31 - k32
+			Data[32 + j] = k41 - k42
+		end
+		for i = 0, 56, 8 do
+			local k11 = (Data[i + 1] + Data[i + 5]) * c4 + c2 * Data[i + 3] + c6 * Data[i + 7]
+			local k21 = (Data[i + 1] - Data[i + 5]) * c4 + c6 * Data[i + 3] - c2 * Data[i + 7]
+			local k31 = (Data[i + 1] - Data[i + 5]) * c4 - c6 * Data[i + 3] + c2 * Data[i + 7]
+			local k41 = (Data[i + 1] + Data[i + 5]) * c4 - c2 * Data[i + 3] - c6 * Data[i + 7]
+			local k12 = c1 * Data[i + 2] + c3 * Data[i + 4] + c5 * Data[i + 6] + c7 * Data[i + 8]
+			local k22 = c3 * Data[i + 2] - c7 * Data[i + 4] - c1 * Data[i + 6] - c5 * Data[i + 8]
+			local k32 = c5 * Data[i + 2] - c1 * Data[i + 4] + c7 * Data[i + 6] + c3 * Data[i + 8]
+			local k42 = c7 * Data[i + 2] - c5 * Data[i + 4] + c3 * Data[i + 8] - c1 * Data[i + 8]
+			Data[i + 1] = k11 + k12
+			Data[i + 2] = k21 + k22
+			Data[i + 3] = k31 + k32
+			Data[i + 4] = k41 + k42
+			Data[i + 8] = k11 - k12
+			Data[i + 7] = k21 - k22
+			Data[i + 6] = k31 - k32
+			Data[i + 5] = k41 - k42
+		end
+	end
+	return IDCT
+end
+modules["modules.standard.jpeg"] = function()
+	local Buffer = drequire("modules.standard.jpeg.BitBuffer")
+	local HuffmanTree = drequire("modules.standard.jpeg.HuffmanTree")
+	local IDCT = drequire("modules.standard.jpeg.IDCT")
+	local SOI = 0xD8
+	local EOI = 0xD9
+	local SOF0 = 0xC0
+	local SOF1 = 0xC1
+	local SOF2 = 0xC2
+	local SOF3 = 0xC3
+	local DHT = 0xC4
+	local DQT = 0xDB
+	local DRI = 0xDD
+	local SOS = 0xDA
+	local DNL = 0xDC
+	local RSTnMin = 0xD0
+	local APPn = 0xE0
+	local JFIFHeader = 0xE0
+	local DAC = 0xCC
+	local ZigZag = {
+		1, 2, 6, 7, 15, 16, 28, 29,
+		3, 5, 8, 14, 17, 27, 30, 43,
+		4, 9, 13, 18, 26, 31, 42, 44,
+		10, 12, 19, 25, 32, 41, 45, 54,
+		11, 20, 24, 33, 40, 46, 53, 55,
+		21, 23, 34, 39, 47, 52, 56, 61,
+		22, 35, 38, 48, 51, 57, 60, 62,
+		36, 37, 49, 50, 58, 59, 63, 64
+	}
+	function YCbCrToRGB(ImageInfo)
+		local Pixels = ImageInfo.Pixels
+		local Offset = ImageInfo.SamplePrecision > 0 and bit32.lshift(1, (ImageInfo.SamplePrecision - 1)) or 0
+		local Max = Offset * 2 - 1
+		local function Clamp(x)
+			if (x > Max) then return Max end
+			if (x < 0) then return 0 end
+			return x
+		end
+		local Index = 1
+		for i = 1, ImageInfo.Y, 1 do
+			for j = 1, ImageInfo.X, 1 do
+				local y = Pixels[1][Index]
+				local Cb = Pixels[2][Index] - Offset
+				local Cr = Pixels[3][Index] - Offset
+				local R = Clamp(y + 1.402 * Cr)
+				local G = Clamp(y - 0.34414 * Cb - 0.71414 * Cr)
+				local B = Clamp(y + 1.772 * Cb)
+				Pixels[1][Index] = math.floor(R + 0.5)
+				Pixels[2][Index] = math.floor(G + 0.5)
+				Pixels[3][Index] = math.floor(B + 0.5)
+				Index = Index + 1
+			end
+		end
+	end
+	function ReadQuantizationTables(Buff, ImageInfo)
+		local Length = Buff:ReadBytes(2) - 2
+		while (Length > 0) do
+			local Precision = Buff:ReadBits(4) == 0 and 1 or 2
+			local Tq = Buff:ReadBits(4)
+			local QuantizationTable = {}
+			Length = Length - 1
+			for v = 1, 64, 1 do QuantizationTable[v] = Buff:ReadBytes(Precision) end
+			Length = Length - Precision * 64
+			ImageInfo.QuantizationTables[Tq + 1] = QuantizationTable
+		end
+	end
+	function ReadHuffmanTable(Buff, ImageInfo)
+		local Length = Buff:ReadBytes(2) - 2
+		while (Length > 0) do
+			local TableClass = Buff:ReadBits(4)
+			local Dest = Buff:ReadBits(4)
+			local CodeLengths = {}
+			local GeneratedHuffmanCodes = HuffmanTree.New()
+			local CurrentCode = 0
+			for i = 1, 16, 1 do CodeLengths[i] = Buff:ReadBytes(1) end
+			Length = Length - 17
+			for i = 1, 16, 1 do
+				for j = 1, CodeLengths[i], 1 do
+					local Value = Buff:ReadBytes(1)
+					GeneratedHuffmanCodes:AddCode(CurrentCode, i, Value)
+					CurrentCode = CurrentCode + 1
+				end
+				Length = Length - CodeLengths[i]
+				CurrentCode = bit32.lshift(CurrentCode, 1)
+			end
+			if (TableClass == 1) then
+				ImageInfo.ACHuffmanCodes[Dest + 1] = GeneratedHuffmanCodes
+			else
+				ImageInfo.DCHuffmanCodes[Dest + 1] = GeneratedHuffmanCodes
+			end
+		end
+	end
+	function ReadJFIFHeader(Buff)
+		local Length = Buff:ReadBytes(2)
+		local Identfier = Buff:ReadBytes(5)
+		if (Identfier ~= 0x4A46494600) then
+			Buff:ReadBytes(Length - 7)
+			return
+		end
+		local Version = Buff:ReadBytes(2)
+		local Density = Buff:ReadBytes(1)
+		local XDensity = Buff:ReadBytes(2)
+		local YDensity = Buff:ReadBytes(2)
+		local XThumbnail = Buff:ReadBytes(1)
+		local YThumbnail = Buff:ReadBytes(1)
+		Buff:ReadBytes(XThumbnail * YThumbnail)
+	end
+	function ReadFrame(Buff, ImageInfo)
+		local Length = Buff:ReadBytes(2)
+		local Precision = Buff:ReadBytes(1)
+		ImageInfo.SamplePrecision = Precision
+		ImageInfo.Y = Buff:ReadBytes(2)
+		ImageInfo.X = Buff:ReadBytes(2)
+		ImageInfo.HMax = 1
+		ImageInfo.VMax = 1
+		local ComponantsInFrame = Buff:ReadBytes(1)
+		for i = 1, ComponantsInFrame, 1 do
+			local Identifier = Buff:ReadBytes(1)
+			local Componant = {
+				HorizontalSamplingFactor = Buff:ReadBits(4),
+				VerticalSamplingFactor = Buff:ReadBits(4),
+				QuantizationTableDestination = Buff:ReadBytes(1)
+			}
+			if (Componant.HorizontalSamplingFactor > ImageInfo.HMax) then ImageInfo.HMax = Componant.HorizontalSamplingFactor end
+			if (Componant.VerticalSamplingFactor > ImageInfo.VMax) then ImageInfo.VMax = Componant.VerticalSamplingFactor end
+			ImageInfo.ComponantsInfo[Identifier] = Componant
+			ImageInfo.Pixels[i] = {}
+		end
+		for p, c in pairs(ImageInfo.ComponantsInfo) do
+			local BlocksXDim = math.ceil(math.ceil(ImageInfo.X / 8) * (c.HorizontalSamplingFactor / ImageInfo.HMax))
+			local BlocksYDim = math.ceil(math.ceil(ImageInfo.Y / 8) * (c.VerticalSamplingFactor / ImageInfo.VMax))
+			ImageInfo.Blocks[p] = {}
+			ImageInfo.Blocks[p].X = BlocksXDim
+			ImageInfo.Blocks[p].Y = BlocksYDim
+			local NumComponantBlocks = BlocksXDim * BlocksYDim
+			for i = 1, NumComponantBlocks, 1 do
+				local Block = {}
+				for v = 1, 64, 1 do Block[v] = 0 end
+				ImageInfo.Blocks[p][i] = Block
+			end
+		end
+	end
+	function IndexHuffmanTree(Tree, Buff)
+		local Current = Tree.Root
+		while (Current.Value == nil) do Current = Current[Buff:ReadBit()] end
+		return Current.Value
+	end
+	function Extend(V, T)
+		if (T == 0) then return 0 end
+		return V < bit32.lshift(1, (T - 1)) and V - bit32.lshift(1, T) + 1 or V
+	end
+	function ScanDimensions(ComponantsInScan, ComponantParameters, ImageInfo)
+		local ScanHMax = 1
+		local ScanVMax = 1
+		for i = 1, ComponantsInScan, 1 do
+			local ComponantParams = ComponantParameters[1]
+			local ComponantInfo = ImageInfo.ComponantsInfo[ComponantParams.ScanComponantIndex]
+			if (ComponantInfo.HorizontalSamplingFactor > ScanHMax) then ScanHMax = ComponantInfo.HorizontalSamplingFactor end
+			if (ComponantInfo.VerticalSamplingFactor > ScanVMax) then ScanVMax = ComponantInfo.VerticalSamplingFactor end
+		end
+		local MCUXDim = math.ceil(ImageInfo.X / (8 * ScanHMax))
+		local MCUYDim = math.ceil(ImageInfo.Y / (8 * ScanVMax))
+		local TotalMCUs
+		if (ComponantsInScan > 1) then
+			TotalMCUs = MCUXDim * MCUYDim
+		else
+			local CInfo = ImageInfo.ComponantsInfo[ComponantParameters[1].ScanComponantIndex]
+			TotalMCUs = math.max(CInfo.HorizontalSamplingFactor, math.ceil(math.ceil(ImageInfo.X * CInfo.HorizontalSamplingFactor / ImageInfo.HMax) / 8)) *
+				math.max(CInfo.VerticalSamplingFactor, math.ceil(math.ceil(ImageInfo.Y * CInfo.VerticalSamplingFactor / ImageInfo.VMax) / 8))
+		end
+		return MCUXDim, TotalMCUs
+	end
+	function ReadSpectralScan(Buff, Ss, Se, Al, Ah, ComponantsInScan, ComponantParameters, ImageInfo)
+		local MCUXDim, TotalMCUs = ScanDimensions(ComponantsInScan, ComponantParameters, ImageInfo)
+		local RestartInterval = ImageInfo.RestartInterval
+		local PreviousDCCoefficients = {}
+		local EndOfBandRun = 0
+		for i = 1, ComponantsInScan, 1 do PreviousDCCoefficients[i] = 0 end
+		for MCU = 1, TotalMCUs, 1 do
+			for i = 1, ComponantsInScan, 1 do
+				local ComponantParams = ComponantParameters[i]
+				local ComponantInfo = ImageInfo.ComponantsInfo[ComponantParams.ScanComponantIndex]
+				local ACHuffmanTree = ImageInfo.ACHuffmanCodes[ComponantParams.ACTableIndex + 1]
+				local DCHuffmanTree = ImageInfo.DCHuffmanCodes[ComponantParams.DCTableIndex + 1]
+				local NumComponantBlocks = ComponantsInScan > 1 and ComponantInfo.HorizontalSamplingFactor * ComponantInfo.VerticalSamplingFactor or 1
+				for c = 1, NumComponantBlocks, 1 do
+					if (EndOfBandRun > 0 and EndOfBandRun - (NumComponantBlocks - c + 1) >= 0) then
+						EndOfBandRun = EndOfBandRun - (NumComponantBlocks - c + 1)
+						break
+					else
+						c = c + EndOfBandRun
+						EndOfBandRun = 0
+					end
+					local BlockData
+					local K = Ss + 1
+					local BlocksXDim = ImageInfo.Blocks[ComponantParams.ScanComponantIndex].X
+					local BlocksYDim = ImageInfo.Blocks[ComponantParams.ScanComponantIndex].Y
+					if (ComponantsInScan > 1) then
+						local MCUYIndex = (MCU-1) // MCUXDim
+						local MCUXIndex = (MCU-1) - MCUYIndex * MCUXDim
+						local BlockY = MCUYIndex * ComponantInfo.VerticalSamplingFactor + (c-1) // ComponantInfo.HorizontalSamplingFactor
+						local BlockX = MCUXIndex * ComponantInfo.HorizontalSamplingFactor + ((c-1) % ComponantInfo.HorizontalSamplingFactor) + 1
+						if (BlockX <= BlocksXDim and BlockY <= BlocksYDim) then
+							BlockData = ImageInfo.Blocks[ComponantParams.ScanComponantIndex][BlockY * BlocksXDim + BlockX]
+						end
+					else
+						local MCUYIndex = (MCU-1) // BlocksXDim
+						local MCUXIndex = (MCU-1) - MCUYIndex * BlocksXDim
+						if (MCUXIndex <= BlocksXDim and MCUYIndex <= BlocksYDim) then
+							BlockData = ImageInfo.Blocks[ComponantParams.ScanComponantIndex][MCU]
+						end
+					end
+					if (BlockData == nil) then
+						BlockData = {}
+						for l = 1, 64, 1 do BlockData[l] = 0 end
+					end
+					if (Ss == 0) then
+						local T = IndexHuffmanTree(DCHuffmanTree, Buff)
+						local DIFF = Extend(Buff:ReadBits(T), T) + PreviousDCCoefficients[i]
+						PreviousDCCoefficients[i] = DIFF
+						BlockData[K] = BlockData[K] + DIFF * bit32.lshift(1, Al)
+						K = K + 1
+					end
+					while (K <= Se + 1) do
+						local RS = IndexHuffmanTree(ACHuffmanTree, Buff)
+						local LowerNibble = bit32.band(RS, 0xF)
+						local HigherNibble = bit32.rshift(RS, 4)
+						if (LowerNibble == 0) then
+							if (HigherNibble == 15) then
+								K = K + 16
+							else
+								EndOfBandRun = bit32.lshift(1, HigherNibble) + Buff:ReadBits(HigherNibble) - 1
+								break
+							end
+						else
+							K = K + HigherNibble
+							BlockData[K] = BlockData[K] + Extend(Buff:ReadBits(LowerNibble), LowerNibble) * bit32.lshift(1, Al)
+							K = K + 1
+						end
+					end
+				end
+			end
+			if (RestartInterval ~= 0 and MCU % RestartInterval == 0 and MCU ~= TotalMCUs) then
+				Buff:Align()
+				local ExpextedMarker = 0xFF00 + RSTnMin + (((MCU - RestartInterval) // RestartInterval) % 8)
+				local Marker = Buff:ReadBytes(2)
+				if (Marker ~= ExpextedMarker) then
+					return
+				end
+				EndOfBandRun = 0
+				for i = 1, ComponantsInScan, 1 do PreviousDCCoefficients[i] = 0 end
+			end
+		end
+	end
+	function ReadRefinementScan(Buff, Ss, Se, Al, Ah, ComponantsInScan, ComponantParameters, ImageInfo)
+		local EndOfBandRun = 0
+		local RestartInterval = ImageInfo.RestartInterval
+		local Positive = bit32.lshift(1, Al)
+		local Negative = -1 * Positive
+		local MCUXDim, TotalMCUs = ScanDimensions(ComponantsInScan, ComponantParameters, ImageInfo)
+		for MCU = 1, TotalMCUs, 1 do
+			for i = 1, ComponantsInScan, 1 do
+				local ComponantParams = ComponantParameters[i]
+				local ComponantInfo = ImageInfo.ComponantsInfo[ComponantParams.ScanComponantIndex]
+				local ACHuffmanTree = ImageInfo.ACHuffmanCodes[ComponantParams.ACTableIndex + 1]
+				local NumComponantBlocks = ComponantsInScan > 1 and ComponantInfo.HorizontalSamplingFactor * ComponantInfo.VerticalSamplingFactor or 1
+				for c = 1, NumComponantBlocks, 1 do
+					local BlockData
+					local K = Ss + 1
+					local BlocksXDim = ImageInfo.Blocks[ComponantParams.ScanComponantIndex].X
+					local BlocksYDim = ImageInfo.Blocks[ComponantParams.ScanComponantIndex].Y
+					if (ComponantsInScan > 1) then
+						local MCUYIndex = (MCU-1) // MCUXDim
+						local MCUXIndex = (MCU-1) - MCUYIndex * MCUXDim
+						local BlockY = MCUYIndex * ComponantInfo.VerticalSamplingFactor + (c-1) // ComponantInfo.HorizontalSamplingFactor
+						local BlockX = MCUXIndex * ComponantInfo.HorizontalSamplingFactor + ((c-1) % ComponantInfo.HorizontalSamplingFactor) + 1
+						if (BlockX <= BlocksXDim and BlockY <= BlocksYDim) then
+							BlockData = ImageInfo.Blocks[ComponantParams.ScanComponantIndex][BlockY * BlocksXDim + BlockX]
+						end
+					else
+						local MCUYIndex = (MCU-1) // BlocksXDim
+						local MCUXIndex = (MCU-1) - MCUYIndex * BlocksXDim
+						if (MCUXIndex <= BlocksXDim and MCUYIndex <= BlocksYDim) then
+							BlockData = ImageInfo.Blocks[ComponantParams.ScanComponantIndex][MCU]
+						end
+					end
+					if (BlockData == nil) then
+						BlockData = {}
+						for l = 1, 64, 1 do BlockData[l] = 0 end
+					end
+					if (Ss == 0 and EndOfBandRun == 0) then
+						local Bit = Buff:ReadBit()
+						if (BlockData[K] == 0) then
+							BlockData[K] = (Bit == 0 and Negative or Positive)
+						else
+							BlockData[K] = BlockData[K] + (BlockData[K] < 0 and Negative or Positive)
+						end
+						K = K + 1
+						if (Se ~= 0) then error("invalid refinement scan, DC and AC coeffecients are mixed") end
+					end
+					while (K <= Se + 1 and EndOfBandRun == 0) do
+						local RS = IndexHuffmanTree(ACHuffmanTree, Buff)
+						local LowerNibble = bit32.band(RS, 0xF)
+						local HigherNibble = bit32.rshift(RS, 4)
+						if (LowerNibble == 0) then
+							if (HigherNibble == 15) then
+								local Skip = 16
+								while (Skip > 0 and K <= Se+1) do
+									if (BlockData[K] ~= 0) then
+										BlockData[K] = BlockData[K] + Buff:ReadBit() * (BlockData[K] < 0 and Negative or Positive)
+									else
+										Skip = Skip - 1
+									end
+									K = K + 1
+								end
+							else
+								EndOfBandRun = bit32.lshift(1, HigherNibble) + Buff:ReadBits(HigherNibble)
+								break
+							end
+						else
+							local Skip = HigherNibble
+							local Sign = Buff:ReadBits(LowerNibble) == 1 and 1 or -1
+							while ((Skip > 0 or BlockData[K] ~= 0) and K <= Se+1) do
+								if (BlockData[K] ~= 0) then
+									BlockData[K] = BlockData[K] + Buff:ReadBit() * (BlockData[K] < 0 and Negative or Positive)
+								else
+									Skip = Skip - 1
+								end
+								K = K + 1
+							end
+							if (K > Se + 1) then break end
+							BlockData[K] = BlockData[K] + Sign * bit32.lshift(1, Al)
+							K = K + 1
+						end
+					end
+					if (EndOfBandRun > 0) then
+						while (K <= Se + 1) do
+							if (BlockData[K] ~= 0) then
+								BlockData[K] = BlockData[K] + bit32.lshift(Buff:ReadBit(), Al) * (BlockData[K] < 0 and -1 or 1)
+							end
+							K = K + 1
+						end
+						EndOfBandRun = EndOfBandRun - 1
+					end
+				end
+			end
+			if (ImageInfo.RestartInterval ~= 0 and MCU % ImageInfo.RestartInterval == 0 and MCU ~= TotalMCUs) then
+				Buff:Align()
+				local ExpextedMarker = 0xFF00 + RSTnMin + (((MCU - RestartInterval) // RestartInterval) % 8)
+				local Marker = Buff:ReadBytes(2)
+				if (Marker ~= ExpextedMarker) then
+					return
+				end
+				EndOfBandRun = 0
+			end
+		end
+	end
+	function ReadScan(Buff, ImageInfo)
+		local Length = Buff:ReadBytes(2)
+		local ComponantsInScan = Buff:ReadBytes(1)
+		local ComponantParameters = {}
+		for i = 1, ComponantsInScan, 1 do
+			local Parameters = {
+				ScanComponantIndex = Buff:ReadBytes(1),
+				DCTableIndex = Buff:ReadBits(4),
+				ACTableIndex = Buff:ReadBits(4)
+			}
+			ComponantParameters[i] = Parameters
+		end
+		local Ss = Buff:ReadBytes(1)
+		local Se = Buff:ReadBytes(1)
+		local Ah = Buff:ReadBits(4)
+		local Al = Buff:ReadBits(4)
+		if (Ah == 0) then
+			ReadSpectralScan(Buff, Ss, Se, Al, Ah, ComponantsInScan, ComponantParameters, ImageInfo)
+		else
+			ReadRefinementScan(Buff, Ss, Se, Al, Ah, ComponantsInScan, ComponantParameters, ImageInfo)
+		end
+		task.wait()
+	end
+	function ReadRestartInterval(Buff, ImageInfo)
+		local Length = Buff:ReadBytes(2)
+		ImageInfo.RestartInterval = Buff:ReadBytes(2)
+	end
+	function ReadDNL(Buff)
+		local Length = Buff:ReadBytes(2)
+		local NumLines = Buff:ReadBytes(2)
+	end
+	function InterpretMarker(Buff, ImageInfo)
+		local Marker = Buff:ReadBytes(1)
+		if (Marker == DQT) then
+			ReadQuantizationTables(Buff, ImageInfo)
+		elseif (Marker == DHT) then
+			ReadHuffmanTable(Buff, ImageInfo)
+		elseif (Marker == JFIFHeader) then
+			ReadJFIFHeader(Buff)
+		elseif (Marker == SOF0 or Marker == SOF1 or Marker == SOF2) then
+			ReadFrame(Buff, ImageInfo)
+		elseif (Marker == SOS) then
+			ReadScan(Buff, ImageInfo)
+			Buff:Align()
+		elseif (Marker == DRI) then
+			ReadRestartInterval(Buff, ImageInfo)
+		elseif (Marker == EOI) then
+			return -1
+		elseif (Marker == DAC) then
+			error("Arithmetic encoding is not supported")
+		elseif (Marker == DNL) then
+			ReadDNL(Buff)
+			error("DNL currently unsupported")
+		elseif (Marker ~= 0) then
+			local Len = Buff:ReadBytes(2) - 2
+			if (SOF2 < Marker and Marker <= 0xCF) then error("Unsupported frame:", Marker) end
+			Buff:ReadBytes(Len)
+		end
+	end
+	function TransformBlocks(ImageInfo)
+		local Blocks = ImageInfo.Blocks
+		local Pixels = ImageInfo.Pixels
+		local X = ImageInfo.X
+		local Y = ImageInfo.Y
+		for c, info in pairs(ImageInfo.ComponantsInfo) do
+			local QuantizationTable = ImageInfo.QuantizationTables[info.QuantizationTableDestination+1]
+			local XScale = ImageInfo.HMax // info.HorizontalSamplingFactor
+			local YScale = ImageInfo.VMax // info.VerticalSamplingFactor
+			local SubImageX = XScale * 8
+			local SubImageY = YScale * 8
+			for yb = 1, Blocks[c].Y, 1 do
+				for xb = 1, Blocks[c].X, 1 do
+					local BlockIndex = (yb - 1) * Blocks[c].X + xb
+					local DecodedBlock = Blocks[c][BlockIndex]
+					local Block = {}
+					for v = 1, 64, 1 do Block[v] = DecodedBlock[ZigZag[v]] * QuantizationTable[ZigZag[v]] end
+					IDCT(Block)
+					local Offset = ImageInfo.SamplePrecision > 0 and bit32.lshift(1, (ImageInfo.SamplePrecision - 1)) or 0
+					for v = 1, 64, 1 do Block[v] = Block[v] + Offset end
+					local HorizontalEdge = math.min(SubImageY, (Y - ((yb - 1) * SubImageY)))
+					local VerticalEdge = math.min(SubImageX, (X - ((xb - 1) * SubImageX)))
+					local ImageYIndex = (yb - 1) * SubImageY * X
+					local ImageXIndex = (xb - 1) * SubImageX
+					for y = 1, HorizontalEdge, 1 do
+						local BlockYIndex = (y - 1) // YScale
+						for x = 1, VerticalEdge, 1 do
+							local BlockXIndex = (x - 1) // XScale
+							Pixels[c][ImageYIndex + ImageXIndex + 1] = Block[BlockYIndex * 8 + BlockXIndex + 1]
+							ImageXIndex = ImageXIndex + 1
+						end
+						ImageXIndex = ImageXIndex - VerticalEdge
+						ImageYIndex = ImageYIndex + X
+					end
+				end
+			end
+		end
+	end
+	function DecodeJpeg(BString)
+		local Buff = Buffer.New(BString)
+		if (Buff:ReadBytes(2) ~= 0xFF00 + SOI) then return end
+		local ImageInfo = {
+			X = 0, Y = 0, Pixels = {},
+			QuantizationTables = {{}, {}, {}, {}},
+			DCHuffmanCodes = {{}, {}, {}, {}},
+			ACHuffmanCodes = {{}, {}, {}, {}},
+			ComponantsInfo = {}, HMax = 0, VMax = 0,
+			SamplePrecision = 0, RestartInterval = 0, Blocks = {}
+		}
+		while (not Buff:IsEmpty()) do
+			local Byte = Buff:ReadBytes(1)
+			if (Byte == 0xFF) then
+				local R = InterpretMarker(Buff, ImageInfo)
+				if (R == -1) then break end
+			end
+		end
+		TransformBlocks(ImageInfo)
+		YCbCrToRGB(ImageInfo)
+		ImageInfo.Blocks = nil
+		return ImageInfo
+	end
+	return {decode=DecodeJpeg}
+end
+modules["modules.standard.universal_image_loader"] = function()
+	local PNG = drequire("modules.standard.png")
+	local JPEG = drequire("modules.standard.jpeg")
+	local UniversalImage = {}
+	UniversalImage.__index = UniversalImage
+	local function createPNGWrapper(pngImage)
+		local wrapper = { Width = pngImage.Width, Height = pngImage.Height, _type = "PNG", _pngImage = pngImage }
+		function wrapper:GetPixel(x, y)
+			local color, alpha = self._pngImage:GetPixel(x, y)
+			return color, (alpha or 255) / 255
+		end
+		return setmetatable(wrapper, UniversalImage)
+	end
+	local function createJPEGWrapper(jpegImage)
+		local wrapper = { Width = jpegImage.X, Height = jpegImage.Y, _type = "JPEG", _jpegImage = jpegImage }
+		function wrapper:GetPixel(x, y)
+			local index = (y - 1) * self.Width + x
+			local r = self._jpegImage.Pixels[1][index] or 0
+			local g = self._jpegImage.Pixels[2][index] or 0
+			local b = self._jpegImage.Pixels[3][index] or 0
+			local color = Color3.fromRGB(r, g, b)
+			return color, 1
+		end
+		return setmetatable(wrapper, UniversalImage)
+	end
+	function UniversalImage.load(fileData, formatHint)
+		local isPNG = string.sub(fileData, 1, 8) == "\137PNG\r\n\26\n"
+		local isJPEG = string.sub(fileData, 1, 2) == "\255\216"
+		if not isPNG and not isJPEG then
+			if formatHint == "PNG" then isPNG = true
+			elseif formatHint == "JPEG" or formatHint == "JPG" then isJPEG = true
+			else error("UniversalImageLoader: Cannot detect image format", 2) end
+		end
+		if isPNG then
+			local pngImage = PNG.new(fileData)
+			return createPNGWrapper(pngImage)
+		elseif isJPEG then
+			local jpegImage = JPEG.decode(fileData)
+			return createJPEGWrapper(jpegImage)
+		else
+			error("UniversalImageLoader: Unsupported image format", 2)
+		end
+	end
+	return UniversalImage
+end
+modules["modules.drawme.canvas"] = function()
+	local Players = game:GetService("Players")
+	local canvas = {}
+	canvas.get_canvas_from_gc = function()
+		if not (getgc and debug and debug.getupvalues and getfenv) then return nil end
+		for i, func in pairs(getgc()) do
+			if type(func) == "function" then
+				local success, fenv = pcall(getfenv, func)
+				if success and fenv then
+					local scriptRef = rawget(fenv, "script")
+					if scriptRef and tostring(scriptRef) == "DM_Drawing" then
+						local upvalues = debug.getupvalues(func)
+						for index, upval in ipairs(upvalues) do
+							if type(upval) == "table" and rawget(upval, "Internal") and upval.Internal.RenderEditableImage then
+								return upval.Internal.RenderEditableImage.EditableImage
+							end
+						end
+					end
+				end
+			end
+		end
+		return nil
+	end
+	canvas.get_canvas_from_instance = function()
+		local localPlayer = Players.LocalPlayer
+		if not localPlayer then return nil end
+		local playerGui = localPlayer:FindFirstChild("PlayerGui")
+		if not playerGui then return nil end
+		local container = playerGui:FindFirstChild("ScreenGui")
+			and playerGui.ScreenGui:FindFirstChild("DrawingCanvasGuis")
+		local searchRoot = container or playerGui
+		for _, v in ipairs(searchRoot:GetDescendants()) do
+			if v:IsA("ImageLabel") and v.Name == "RenderImageLabel" then
+				if v.ImageContent and v.ImageContent.SourceType == Enum.ContentSourceType.Object then
+					local editableImage = v.ImageContent.Object
+					if editableImage and editableImage:IsA("EditableImage") then
+						return editableImage
+					end
+				end
+			end
+		end
+		return nil
+	end
+	canvas.get_canvas = function()
+		local result = nil
+		if type(getgc) == "function" then result = canvas.get_canvas_from_gc() end
+		if not result then result = canvas.get_canvas_from_instance() end
+		return result
+	end
+	return canvas
+end
+local function http_get(url)
+	local request_func = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
+	if request_func then
+		local response = request_func({Url = url, Method = "GET"})
+		if response.StatusCode == 200 then return response.Body end
+	else
+		return game:HttpGet(url)
+	end
+	return nil
+end
+local function validate_image_data(data)
+	if not data or #data < 4 then return false, "Empty or too small" end
+	if data:sub(1, 8) == "\137PNG\r\n\26\n" then return true, "PNG" end
+	if data:sub(1, 3) == "\255\216\255" then return true, "JPG" end
+	return false, "Unknown Header"
+end
+local image_loader = drequire("modules.standard.universal_image_loader")
+local canvas_mod = drequire("modules.drawme.canvas")
+local function draw_from_url(url)
+	if not url or url == "" then
+		warn("[auto draw]: URL box is blank.")
+		return
+	end
+	local targetImage = canvas_mod.get_canvas()
+	if not targetImage then
+		warn("[auto draw]: Target drawing canvas target image context cannot be resolved.")
+		return
+	end
+	print("[auto draw]: Requesting web resources from targeted endpoint...")
+	local success, result = pcall(function() return http_get(url) end)
+	if not success or not result then
+		warn("[auto draw]: HTTP network pipeline fault encountered.")
+		return
+	end
+	local isValid, fileType = validate_image_data(result)
+	if not isValid then
+		warn("[auto draw]: Structural signature tracking breakdown: " .. tostring(fileType))
+		return
+	end
+	local canvasSize = targetImage.Size
+	setthreadidentity(8)
+	print("[auto draw]: Processing incoming raw byte sequences: " .. fileType)
+	local image = image_loader.load(result, fileType)
+	local srcWidth, srcHeight = image.Width, image.Height
+	local dstWidth = canvasSize.X
+	local dstHeight = canvasSize.Y
+	local bufferSize = dstWidth * dstHeight * 4
+	local pixelBuffer = buffer.create(bufferSize)
+	local ratioX = srcWidth / dstWidth
+	local ratioY = srcHeight / dstHeight
+	local pointer = 0
+	for y = 1, dstHeight do
+		local sampleY = math.floor((y - 1) * ratioY) + 1
+		if sampleY > srcHeight then sampleY = srcHeight end
+		for x = 1, dstWidth do
+			local sampleX = math.floor((x - 1) * ratioX) + 1
+			if sampleX > srcWidth then sampleX = srcWidth end
+			local color, alpha = image:GetPixel(sampleX, sampleY)
+			local aVal = alpha or 1
+			buffer.writeu8(pixelBuffer, pointer, math.floor(color.R * 255))
+			buffer.writeu8(pixelBuffer, pointer + 1, math.floor(color.G * 255))
+			buffer.writeu8(pixelBuffer, pointer + 2, math.floor(color.B * 255))
+			buffer.writeu8(pixelBuffer, pointer + 3, math.floor(aVal * 255))
+			pointer = pointer + 4
+		end
+	end
+	print("[auto draw]: Direct graphics block transfer stream initiated...")
+	local writeSuccess, writeErr = pcall(function()
+		targetImage:WritePixelsBuffer(Vector2.zero, canvasSize, pixelBuffer)
+	end)
+	if not writeSuccess then
+		warn("[auto draw]: Dynamic draw matrix failed assignment: " .. tostring(writeErr))
+	else
+		print("[auto draw]: Design asset composition operations completed.")
+	end
+end
+local function getLocalAsset(fileName, url)
+	if not writefile or not getcustomasset then
+		return url
+	end
+	local success, _ = pcall(function()
+		if not isfile(fileName) then
+			local response = game:HttpGet(url)
+			writefile(fileName, response)
+		end
+	end)
+	if success then
+		return getcustomasset(fileName)
+	else
+		return url
+	end
+end
+local ICONS = {
+	ScriptIcon = getLocalAsset("oa482y_main.png", "https://files.catbox.moe/oa482y.png"),
+	DrawIcon = getLocalAsset("nxz1dz_main.png", "https://files.catbox.moe/nxz1dz.png"),
+	DrawTab = getLocalAsset("draw_icon_main.png", "https://files.catbox.moe/omzhp3.png"),
+	ExampleTab = getLocalAsset("example_icon_main.png", "https://files.catbox.moe/609pvm.png"),
+	TutorialTab = getLocalAsset("tutorial_icon_main.png", "https://files.catbox.moe/jynt34.png"),
+	DiscordIcon = getLocalAsset("w4ikpj_discord.png", "https://files.catbox.moe/w4ikpj.png"),
+}
+local PRESET_CONFIG = {
+	{ Name = "Draw Goku", URL = "https://files.catbox.moe/y6rbrh.jpeg" },
+	{ Name = "Draw Kirby", URL = "https://files.catbox.moe/gki5i5.jpeg" },
+	{ Name = "Draw Epstein", URL = "https://files.catbox.moe/hsfm85.jpeg" },
+	{ Name = "Draw Retard Cursing Cat", URL = "https://files.catbox.moe/4t5yzr.png" },
+	{ Name = "Draw Meme Cat",URL = "https://files.catbox.moe/7jlvse.jpeg" },
+	{ Name = "Draw KJ (Kilojoule)", URL = "https://files.catbox.moe/eb1c92.jpeg" },
+	{ Name = "Draw ishowspeed (say wallahi)", URL = "https://files.catbox.moe/rz12nm.jpeg" },
+	{ Name = "Draw Geometry Dash Icon", URL = "https://files.catbox.moe/v1eprk.jpeg" },
+	{ Name = "Draw Old Roblox icon", URL = "https://files.catbox.moe/e45mxs.jpeg" },
+	{ Name = "Draw New Roblox Icon", URL = "https://files.catbox.moe/v9jx91.png" },
+}
+LMG2L["ScreenGui_1"] = Instance.new("ScreenGui", game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"))
+LMG2L["ScreenGui_1"]["Name"] = "UrlConvertUI"
+LMG2L["ScreenGui_1"]["ResetOnSpawn"] = false
+LMG2L["ScreenGui_1"]["ZIndexBehavior"] = Enum.ZIndexBehavior.Sibling
+LMG2L["ScreenGui_1"]["DisplayOrder"] = 999
+local infoFast = TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local infoSmooth = TweenInfo.new(0.35, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
+local collapseInfo = TweenInfo.new(0.40, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
+local COL = {
+	BG         = Color3.fromRGB(18, 18, 22),
+	BG2        = Color3.fromRGB(24, 24, 29),
+	BG3        = Color3.fromRGB(32, 32, 39),
+	BG_Hover   = Color3.fromRGB(42, 42, 51),
+	Accent     = Color3.fromRGB(125, 115, 255),
+	AccentLite = Color3.fromRGB(160, 152, 255),
+	Text       = Color3.fromRGB(245, 245, 250),
+	Text2      = Color3.fromRGB(160, 160, 175),
+	Text3      = Color3.fromRGB(105, 105, 120),
+	Border     = Color3.fromRGB(40, 40, 50),
+	BorderLite = Color3.fromRGB(55, 55, 68),
+	Danger     = Color3.fromRGB(255, 90, 90),
+}
+local function corner(parent, r)
+	local c = Instance.new("UICorner", parent)
+	c.CornerRadius = UDim.new(0, r or 8)
+	return c
+end
+local function stroke(parent, thick, color, trans)
+	local s = Instance.new("UIStroke", parent)
+	s.Thickness = thick or 1
+	s.Color = color or COL.Border
+	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	s.Transparency = trans or 0
+	return s
+end
+local function softShadow(parent)
+	local sh = Instance.new("ImageLabel", parent)
+	sh.Name = "Shadow"
+	sh.AnchorPoint = Vector2.new(0.5, 0.5)
+	sh.Position = UDim2.new(0.5, 0, 0.5, 2)
+	sh.Size = UDim2.new(1, 12, 1, 12)
+	sh.BackgroundTransparency = 1
+	sh.Image = "rbxassetid://6014261993"
+	sh.ImageColor3 = Color3.fromRGB(0, 0, 0)
+	sh.ImageTransparency = 0.72
+	sh.ScaleType = Enum.ScaleType.Slice
+	sh.SliceCenter = Rect.new(49, 49, 450, 450)
+	sh.ZIndex = parent.ZIndex - 1
+	return sh
+end
+LMG2L["ModalFrame"] = Instance.new("Frame", LMG2L["ScreenGui_1"])
+local ModalFrame = LMG2L["ModalFrame"]
+ModalFrame.Name = "ModalFrame"
+ModalFrame.BorderSizePixel = 0
+ModalFrame.BackgroundColor3 = COL.BG
+ModalFrame.Size = UDim2.new(0, 370, 0, 210)
+ModalFrame.Position = UDim2.new(0.5, -185, 0.5, -105)
+corner(ModalFrame, 14)
+local strokeModal = stroke(ModalFrame, 1, COL.Border, 0)
+softShadow(ModalFrame)
+local accentBarModal = Instance.new("Frame", ModalFrame)
+accentBarModal.Size = UDim2.new(1, -32, 0, 3)
+accentBarModal.Position = UDim2.new(0, 16, 0, 0)
+accentBarModal.BackgroundColor3 = COL.Accent
+accentBarModal.BorderSizePixel = 0
+accentBarModal.ZIndex = 3
+corner(accentBarModal, 2)
+local modalIcon = Instance.new("ImageLabel", ModalFrame)
+modalIcon.Size = UDim2.new(0, 30, 0, 30)
+modalIcon.Position = UDim2.new(0, 20, 0, 22)
+modalIcon.BackgroundTransparency = 1
+modalIcon.Image = ICONS.ScriptIcon
+modalIcon.ImageColor3 = COL.Accent
+LMG2L["TextLabel_4"] = Instance.new("TextLabel", ModalFrame)
+LMG2L["TextLabel_4"]["BackgroundTransparency"] = 1
+LMG2L["TextLabel_4"]["TextSize"] = 17
+LMG2L["TextLabel_4"]["TextColor3"] = COL.Text
+LMG2L["TextLabel_4"]["FontFace"] = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+LMG2L["TextLabel_4"]["Size"] = UDim2.new(1, -80, 0, 22)
+LMG2L["TextLabel_4"]["Text"] = "Welcome to Url Convert"
+LMG2L["TextLabel_4"]["TextXAlignment"] = Enum.TextXAlignment.Left
+LMG2L["TextLabel_4"]["Position"] = UDim2.new(0, 62, 0, 26)
+LMG2L["TextLabel_6"] = Instance.new("TextLabel", ModalFrame)
+LMG2L["TextLabel_6"]["TextWrapped"] = true
+LMG2L["TextLabel_6"]["BackgroundTransparency"] = 1
+LMG2L["TextLabel_6"]["TextSize"] = 12
+LMG2L["TextLabel_6"]["TextColor3"] = COL.Text2
+LMG2L["TextLabel_6"]["FontFace"] = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular)
+LMG2L["TextLabel_6"]["Size"] = UDim2.new(1, -40, 0, 70)
+LMG2L["TextLabel_6"]["Text"] = "Convert any image URL straight onto your Roblox canvas. Paste a link, click Draw, and it renders instantly.\n\nClick Open to begin."
+LMG2L["TextLabel_6"]["TextXAlignment"] = Enum.TextXAlignment.Left
+LMG2L["TextLabel_6"]["TextYAlignment"] = Enum.TextYAlignment.Top
+LMG2L["TextLabel_6"]["Position"] = UDim2.new(0, 20, 0, 68)
+local modalDivider = Instance.new("Frame", ModalFrame)
+modalDivider.Size = UDim2.new(1, -40, 0, 1)
+modalDivider.Position = UDim2.new(0, 20, 0, 142)
+modalDivider.BackgroundColor3 = COL.Border
+modalDivider.BorderSizePixel = 0
+LMG2L["Btn_Cancel"] = Instance.new("TextButton", ModalFrame)
+LMG2L["Btn_Cancel"]["TextSize"] = 12
+LMG2L["Btn_Cancel"]["TextColor3"] = COL.Text2
+LMG2L["Btn_Cancel"]["BackgroundColor3"] = COL.BG3
+LMG2L["Btn_Cancel"]["FontFace"] = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium)
+LMG2L["Btn_Cancel"]["Size"] = UDim2.new(0, 158, 0, 38)
+LMG2L["Btn_Cancel"]["Text"] = "Exit"
+LMG2L["Btn_Cancel"]["Position"] = UDim2.new(0, 20, 1, -56)
+LMG2L["Btn_Cancel"]["AutoButtonColor"] = false
+corner(LMG2L["Btn_Cancel"], 8)
+local strokeCan = stroke(LMG2L["Btn_Cancel"], 1, COL.Border, 0)
+LMG2L["Btn_Open"] = Instance.new("TextButton", ModalFrame)
+LMG2L["Btn_Open"]["TextSize"] = 12
+LMG2L["Btn_Open"]["TextColor3"] = Color3.new(1, 1, 1)
+LMG2L["Btn_Open"]["BackgroundColor3"] = COL.Accent
+LMG2L["Btn_Open"]["FontFace"] = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+LMG2L["Btn_Open"]["Size"] = UDim2.new(0, 158, 0, 38)
+LMG2L["Btn_Open"]["Text"] = "Open Dashboard"
+LMG2L["Btn_Open"]["Position"] = UDim2.new(1, -178, 1, -56)
+LMG2L["Btn_Open"]["AutoButtonColor"] = false
+corner(LMG2L["Btn_Open"], 8)
+local strokeOp = stroke(LMG2L["Btn_Open"], 1, COL.AccentLite, 0.4)
+LMG2L["DashboardFrame"] = Instance.new("Frame", LMG2L["ScreenGui_1"])
+local Dashboard = LMG2L["DashboardFrame"]
+Dashboard.Name = "DashboardFrame"
+Dashboard.BorderSizePixel = 0
+Dashboard.BackgroundColor3 = COL.BG
+Dashboard.Size = UDim2.new(0, 490, 0, 310)
+Dashboard.Position = UDim2.new(0.5, -245, 0.5, -155)
+Dashboard.Visible = false
+Dashboard.ClipsDescendants = true
+corner(Dashboard, 14)
+local strokeDash = stroke(Dashboard, 1, COL.Border, 0)
+softShadow(Dashboard)
+local accentBar = Instance.new("Frame", Dashboard)
+accentBar.Name = "AccentBar"
+accentBar.Size = UDim2.new(1, -32, 0, 3)
+accentBar.Position = UDim2.new(0, 16, 0, 0)
+accentBar.BackgroundColor3 = COL.Accent
+accentBar.BorderSizePixel = 0
+accentBar.ZIndex = 3
+corner(accentBar, 2)
+local headerBar = Instance.new("Frame", Dashboard)
+headerBar.Name = "Header"
+headerBar.Size = UDim2.new(1, 0, 0, 54)
+headerBar.Position = UDim2.new(0, 0, 0, 0)
+headerBar.BackgroundTransparency = 1
+headerBar.ZIndex = 2
+local headerIcon = Instance.new("ImageLabel", headerBar)
+headerIcon.Size = UDim2.new(0, 22, 0, 22)
+headerIcon.Position = UDim2.new(0, 20, 0, 18)
+headerIcon.BackgroundTransparency = 1
+headerIcon.Image = ICONS.ScriptIcon
+headerIcon.ImageColor3 = COL.Accent
+local dashTitle = Instance.new("TextLabel", headerBar)
+dashTitle.Text = "Url Convert"
+dashTitle.TextColor3 = COL.Text
+dashTitle.TextSize = 14
+dashTitle.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+dashTitle.Size = UDim2.new(0, 200, 0, 22)
+dashTitle.Position = UDim2.new(0, 50, 0, 18)
+dashTitle.BackgroundTransparency = 1
+dashTitle.TextXAlignment = Enum.TextXAlignment.Left
+local headerBadge = Instance.new("TextLabel", headerBar)
+headerBadge.Name = "VersionBadge"
+headerBadge.Text = "1.0.3"
+headerBadge.Size = UDim2.new(0, 54, 0, 20)
+headerBadge.Position = UDim2.new(1, -156, 0, 19)
+headerBadge.BackgroundColor3 = COL.Accent
+headerBadge.TextColor3 = Color3.fromRGB(255, 255, 255)
+headerBadge.TextSize = 10
+headerBadge.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+headerBadge.ZIndex = 3
+corner(headerBadge, 4)
+stroke(headerBadge, 1, Color3.fromRGB(255, 255, 255), 0.7)
+task.spawn(function()
+	local seq = {
+		{bg = Color3.fromRGB(125, 115, 255), txt = Color3.fromRGB(255, 255, 255)},
+		{bg = Color3.fromRGB(240, 240, 248), txt = Color3.fromRGB(18, 18, 22)},
+		{bg = Color3.fromRGB(20, 20, 26),    txt = Color3.fromRGB(200, 195, 255)},
+		{bg = Color3.fromRGB(125, 115, 255), txt = Color3.fromRGB(255, 255, 255)},
+	}
+	while headerBadge.Parent do
+		for i = 1, #seq - 1 do
+			local tw = TweenService:Create(headerBadge, TweenInfo.new(1.3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+				BackgroundColor3 = seq[i+1].bg,
+				TextColor3 = seq[i+1].txt,
+			})
+			tw:Play()
+			tw.Completed:Wait()
+			if not headerBadge.Parent then return end
+		end
+	end
+end)
+local minimizeBtn = Instance.new("TextButton", headerBar)
+minimizeBtn.Name = "MinimizeBtn"
+minimizeBtn.Text = "—"
+minimizeBtn.Size = UDim2.new(0, 28, 0, 28)
+minimizeBtn.Position = UDim2.new(1, -78, 0, 13)
+minimizeBtn.BackgroundColor3 = COL.BG3
+minimizeBtn.TextColor3 = COL.Text2
+minimizeBtn.TextSize = 16
+minimizeBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+minimizeBtn.AutoButtonColor = false
+minimizeBtn.ZIndex = 3
+corner(minimizeBtn, 6)
+local closeBtn = Instance.new("TextButton", headerBar)
+closeBtn.Name = "CloseBtn"
+closeBtn.Text = "×"
+closeBtn.Size = UDim2.new(0, 28, 0, 28)
+closeBtn.Position = UDim2.new(1, -44, 0, 13)
+closeBtn.BackgroundColor3 = COL.BG3
+closeBtn.TextColor3 = COL.Text2
+closeBtn.TextSize = 18
+closeBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+closeBtn.AutoButtonColor = false
+closeBtn.ZIndex = 3
+corner(closeBtn, 6)
+local sidebar = Instance.new("Frame", Dashboard)
+sidebar.Name = "Sidebar"
+sidebar.Size = UDim2.new(0, 64, 1, -84)
+sidebar.Position = UDim2.new(0, 12, 0, 68)
+sidebar.BackgroundColor3 = COL.BG2
+sidebar.BorderSizePixel = 0
+corner(sidebar, 10)
+local sidebarDiv = Instance.new("Frame", sidebar)
+sidebarDiv.Size = UDim2.new(0, 36, 0, 1)
+sidebarDiv.Position = UDim2.new(0.5, -18, 0, 54)
+sidebarDiv.BackgroundColor3 = COL.Border
+sidebarDiv.BorderSizePixel = 0
+local pagesContainer = Instance.new("Frame", Dashboard)
+pagesContainer.Name = "PagesContainer"
+pagesContainer.Size = UDim2.new(1, -102, 1, -84)
+pagesContainer.Position = UDim2.new(0, 90, 0, 68)
+pagesContainer.BackgroundTransparency = 1
+local pages = {}
+local function createPage(name)
+	local pg = Instance.new("Frame", pagesContainer)
+	pg.Name = name .. "Page"
+	pg.Size = UDim2.new(1, 0, 1, 0)
+	pg.BackgroundTransparency = 1
+	pg.Visible = false
+	pages[name] = pg
+	return pg
+end
+local drawPage     = createPage("Draw")
+local examplePage  = createPage("Example")
+local tutorialPage = createPage("Tutorial")
+drawPage.Visible = true
+local textContainer = Instance.new("Frame", drawPage)
+textContainer.Size = UDim2.new(1, 0, 0, 42)
+textContainer.Position = UDim2.new(0, 0, 0, 0)
+textContainer.BackgroundColor3 = COL.BG2
+textContainer.BorderSizePixel = 0
+corner(textContainer, 8)
+local strokeBox = stroke(textContainer, 1, COL.Border, 0)
+local linkIcon = Instance.new("ImageLabel", textContainer)
+linkIcon.Size = UDim2.new(0, 16, 0, 16)
+linkIcon.Position = UDim2.new(0, 13, 0.5, -8)
+linkIcon.BackgroundTransparency = 1
+linkIcon.Image = ICONS.DrawIcon
+linkIcon.ImageColor3 = COL.Text3
+LMG2L["TextBox_URL"] = Instance.new("TextBox", textContainer)
+LMG2L["TextBox_URL"].Size = UDim2.new(1, -46, 1, 0)
+LMG2L["TextBox_URL"].Position = UDim2.new(0, 38, 0, 0)
+LMG2L["TextBox_URL"].BackgroundTransparency = 1
+LMG2L["TextBox_URL"].Text = ""
+LMG2L["TextBox_URL"].PlaceholderText = "Paste image URL here..."
+LMG2L["TextBox_URL"].PlaceholderColor3 = COL.Text3
+LMG2L["TextBox_URL"].TextColor3 = COL.Text
+LMG2L["TextBox_URL"].TextSize = 12
+LMG2L["TextBox_URL"].TextXAlignment = Enum.TextXAlignment.Left
+LMG2L["TextBox_URL"].ClearTextOnFocus = false
+LMG2L["TextBox_URL"].FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium)
+local previewCard = Instance.new("Frame", drawPage)
+previewCard.Name = "PreviewCard"
+previewCard.Size = UDim2.new(1, 0, 0, 100)
+previewCard.Position = UDim2.new(0, 0, 0, 52)
+previewCard.BackgroundColor3 = COL.BG2
+previewCard.BorderSizePixel = 0
+corner(previewCard, 8)
+local strokePreview = stroke(previewCard, 1, COL.Border, 0)
+local previewImage = Instance.new("ImageLabel", previewCard)
+previewImage.Name = "PreviewImage"
+previewImage.Size = UDim2.new(0, 80, 1, -16)
+previewImage.Position = UDim2.new(0, 8, 0, 8)
+previewImage.BackgroundColor3 = COL.BG3
+previewImage.BorderSizePixel = 0
+previewImage.Image = ICONS.DrawIcon
+previewImage.ImageColor3 = COL.Text3
+previewImage.ScaleType = Enum.ScaleType.Fit
+corner(previewImage, 6)
+local previewTitle = Instance.new("TextLabel", previewCard)
+previewTitle.Text = "Live Preview"
+previewTitle.Size = UDim2.new(1, -104, 0, 18)
+previewTitle.Position = UDim2.new(0, 98, 0, 14)
+previewTitle.BackgroundTransparency = 1
+previewTitle.TextColor3 = COL.Text
+previewTitle.TextSize = 12
+previewTitle.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+previewTitle.TextXAlignment = Enum.TextXAlignment.Left
+local previewDesc = Instance.new("TextLabel", previewCard)
+previewDesc.Text = "Your image will appear here once you paste a valid URL and click Draw."
+previewDesc.TextWrapped = true
+previewDesc.Size = UDim2.new(1, -104, 0, 60)
+previewDesc.Position = UDim2.new(0, 98, 0, 34)
+previewDesc.BackgroundTransparency = 1
+previewDesc.TextColor3 = COL.Text2
+previewDesc.TextSize = 10
+previewDesc.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular)
+previewDesc.TextXAlignment = Enum.TextXAlignment.Left
+previewDesc.TextYAlignment = Enum.TextYAlignment.Top
+local toggleContainer = Instance.new("Frame", drawPage)
+toggleContainer.Size = UDim2.new(1, 0, 0, 32)
+toggleContainer.Position = UDim2.new(0, 0, 0, 162)
+toggleContainer.BackgroundTransparency = 1
+local toggleLabel = Instance.new("TextLabel", toggleContainer)
+toggleLabel.Text = "Show Layout Preview"
+toggleLabel.TextColor3 = COL.Text2
+toggleLabel.TextSize = 12
+toggleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium)
+toggleLabel.Size = UDim2.new(1, -56, 1, 0)
+toggleLabel.BackgroundTransparency = 1
+toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+local toggleBackground = Instance.new("TextButton", toggleContainer)
+toggleBackground.Size = UDim2.new(0, 42, 0, 22)
+toggleBackground.Position = UDim2.new(1, -42, 0.5, -11)
+toggleBackground.BackgroundColor3 = COL.BG3
+toggleBackground.Text = ""
+toggleBackground.AutoButtonColor = false
+corner(toggleBackground, 11)
+local strokeToggle = stroke(toggleBackground, 1, COL.BorderLite, 0)
+local toggleBall = Instance.new("Frame", toggleBackground)
+toggleBall.Size = UDim2.new(0, 16, 0, 16)
+toggleBall.Position = UDim2.new(0, 3, 0.5, -8)
+toggleBall.BackgroundColor3 = COL.Text3
+toggleBall.BorderSizePixel = 0
+corner(toggleBall, 8)
+LMG2L["Btn_Draw"] = Instance.new("TextButton", drawPage)
+LMG2L["Btn_Draw"]["TextSize"] = 13
+LMG2L["Btn_Draw"]["TextColor3"] = Color3.new(1, 1, 1)
+LMG2L["Btn_Draw"]["BackgroundColor3"] = COL.Accent
+LMG2L["Btn_Draw"]["FontFace"] = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+LMG2L["Btn_Draw"]["Size"] = UDim2.new(1, 0, 0, 40)
+LMG2L["Btn_Draw"]["Text"] = "  Draw Image"
+LMG2L["Btn_Draw"]["Position"] = UDim2.new(0, 0, 1, -40)
+LMG2L["Btn_Draw"]["AutoButtonColor"] = false
+corner(LMG2L["Btn_Draw"], 8)
+local strokeDraw = stroke(LMG2L["Btn_Draw"], 1, COL.AccentLite, 0.4)
+local drawButtonIcon = Instance.new("ImageLabel", LMG2L["Btn_Draw"])
+drawButtonIcon.Name = "DrawButtonIcon"
+drawButtonIcon.Size = UDim2.new(0, 18, 0, 18)
+drawButtonIcon.Position = UDim2.new(0.5, -62, 0.5, -9)
+drawButtonIcon.BackgroundTransparency = 1
+drawButtonIcon.Image = ICONS.DrawIcon
+drawButtonIcon.ImageColor3 = Color3.new(1, 1, 1)
+local exampleScroll = Instance.new("ScrollingFrame", examplePage)
+exampleScroll.Size = UDim2.new(1, 0, 1, 0)
+exampleScroll.BackgroundTransparency = 1
+exampleScroll.BorderSizePixel = 0
+exampleScroll.ScrollBarThickness = 3
+exampleScroll.ScrollBarImageColor3 = COL.BorderLite
+exampleScroll.CanvasSize = UDim2.new(0, 0, 0, (#PRESET_CONFIG * 42) + 4)
+local listLayoutEx = Instance.new("UIListLayout", exampleScroll)
+listLayoutEx.SortOrder = Enum.SortOrder.LayoutOrder
+listLayoutEx.Padding = UDim.new(0, 6)
+for index, config in ipairs(PRESET_CONFIG) do
+	local presetBtn = Instance.new("TextButton", exampleScroll)
+	presetBtn.Name = "PresetButton_" .. index
+	presetBtn.LayoutOrder = index
+	presetBtn.Size = UDim2.new(1, -6, 0, 36)
+	presetBtn.BackgroundColor3 = COL.BG2
+	presetBtn.Text = "   " .. config.Name
+	presetBtn.TextColor3 = COL.Text2
+	presetBtn.TextSize = 11
+	presetBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium)
+	presetBtn.TextXAlignment = Enum.TextXAlignment.Left
+	presetBtn.AutoButtonColor = false
+	corner(presetBtn, 8)
+	local strokePr = stroke(presetBtn, 1, COL.Border, 0)
+	local pIcon = Instance.new("ImageLabel", presetBtn)
+	pIcon.Size = UDim2.new(0, 14, 0, 14)
+	pIcon.Position = UDim2.new(1, -26, 0.5, -7)
+	pIcon.BackgroundTransparency = 1
+	pIcon.Image = ICONS.DrawIcon
+	pIcon.ImageColor3 = COL.Text3
+	presetBtn.MouseEnter:Connect(function()
+		TweenService:Create(presetBtn, infoFast, {BackgroundColor3 = COL.BG_Hover, TextColor3 = COL.Text}):Play()
+		TweenService:Create(strokePr, infoFast, {Color = COL.Accent}):Play()
+		TweenService:Create(pIcon, infoFast, {ImageColor3 = COL.AccentLite}):Play()
+	end)
+	presetBtn.MouseLeave:Connect(function()
+		TweenService:Create(presetBtn, infoFast, {BackgroundColor3 = COL.BG2, TextColor3 = COL.Text2}):Play()
+		TweenService:Create(strokePr, infoFast, {Color = COL.Border}):Play()
+		TweenService:Create(pIcon, infoFast, {ImageColor3 = COL.Text3}):Play()
+	end)
+	presetBtn.MouseButton1Click:Connect(function()
+		task.spawn(function()
+			draw_from_url(config.URL)
+		end)
+	end)
+end
+local tutCard = Instance.new("Frame", tutorialPage)
+tutCard.Size = UDim2.new(1, 0, 0, 92)
+tutCard.Position = UDim2.new(0, 0, 0, 0)
+tutCard.BackgroundColor3 = COL.BG2
+tutCard.BorderSizePixel = 0
+corner(tutCard, 8)
+stroke(tutCard, 1, COL.Border, 0)
+local tutIcon = Instance.new("ImageLabel", tutCard)
+tutIcon.Size = UDim2.new(0, 20, 0, 20)
+tutIcon.Position = UDim2.new(0, 14, 0, 12)
+tutIcon.BackgroundTransparency = 1
+tutIcon.Image = ICONS.TutorialTab
+tutIcon.ImageColor3 = COL.Accent
+local tutTitle = Instance.new("TextLabel", tutCard)
+tutTitle.Text = "How to use"
+tutTitle.Size = UDim2.new(1, -50, 0, 20)
+tutTitle.Position = UDim2.new(0, 42, 0, 12)
+tutTitle.BackgroundTransparency = 1
+tutTitle.TextColor3 = COL.Text
+tutTitle.TextSize = 12
+tutTitle.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+tutTitle.TextXAlignment = Enum.TextXAlignment.Left
+local tutLabel = Instance.new("TextLabel", tutCard)
+tutLabel.Text = "1. Paste image URL in Draw tab\n2. Toggle layout preview if needed\n3. Click Draw to render the image"
+tutLabel.TextColor3 = COL.Text2
+tutLabel.TextSize = 11
+tutLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular)
+tutLabel.Size = UDim2.new(1, -28, 0, 56)
+tutLabel.Position = UDim2.new(0, 14, 0, 34)
+tutLabel.BackgroundTransparency = 1
+tutLabel.TextXAlignment = Enum.TextXAlignment.Left
+tutLabel.TextYAlignment = Enum.TextYAlignment.Top
+tutLabel.TextWrapped = true
+local discordContainer = Instance.new("TextButton", tutorialPage)
+discordContainer.Size = UDim2.new(1, 0, 0, 50)
+discordContainer.Position = UDim2.new(0, 0, 0, 102)
+discordContainer.BackgroundColor3 = COL.BG2
+discordContainer.Text = ""
+discordContainer.AutoButtonColor = false
+corner(discordContainer, 8)
+local strokeDc = stroke(discordContainer, 1, COL.Border, 0)
+local dcIcon = Instance.new("ImageLabel", discordContainer)
+dcIcon.Size = UDim2.new(0, 26, 0, 26)
+dcIcon.Position = UDim2.new(0, 12, 0.5, -13)
+dcIcon.BackgroundTransparency = 1
+dcIcon.Image = ICONS.DiscordIcon
+dcIcon.ImageColor3 = COL.Accent
+local dcLabel = Instance.new("TextLabel", discordContainer)
+dcLabel.Text = "Join our Discord"
+dcLabel.TextColor3 = COL.Text
+dcLabel.TextSize = 12
+dcLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+dcLabel.Size = UDim2.new(1, -60, 0, 16)
+dcLabel.Position = UDim2.new(0, 48, 0, 10)
+dcLabel.BackgroundTransparency = 1
+dcLabel.TextXAlignment = Enum.TextXAlignment.Left
+local dcSub = Instance.new("TextLabel", discordContainer)
+dcSub.Text = "Get help & share creations"
+dcSub.TextColor3 = COL.Text3
+dcSub.TextSize = 10
+dcSub.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular)
+dcSub.Size = UDim2.new(1, -60, 0, 14)
+dcSub.Position = UDim2.new(0, 48, 0, 26)
+dcSub.BackgroundTransparency = 1
+dcSub.TextXAlignment = Enum.TextXAlignment.Left
+local btnCopyDiscord = Instance.new("TextButton", tutorialPage)
+btnCopyDiscord.Name = "Btn_CopyDiscord"
+btnCopyDiscord.Size = UDim2.new(1, 0, 0, 40)
+btnCopyDiscord.Position = UDim2.new(0, 0, 1, -40)
+btnCopyDiscord.BackgroundColor3 = COL.Accent
+btnCopyDiscord.Text = "  Copy Invite Link"
+btnCopyDiscord.TextColor3 = Color3.new(1, 1, 1)
+btnCopyDiscord.TextSize = 12
+btnCopyDiscord.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+btnCopyDiscord.AutoButtonColor = false
+corner(btnCopyDiscord, 8)
+local strokeCopy = stroke(btnCopyDiscord, 1, COL.AccentLite, 0.4)
+local copyIcon = Instance.new("ImageLabel", btnCopyDiscord)
+copyIcon.Size = UDim2.new(0, 14, 0, 14)
+copyIcon.Position = UDim2.new(0.5, -70, 0.5, -7)
+copyIcon.BackgroundTransparency = 1
+copyIcon.Image = ICONS.DiscordIcon
+copyIcon.ImageColor3 = Color3.new(1, 1, 1)
+discordContainer.MouseButton1Click:Connect(function()
+	if setclipboard then
+		setclipboard("https://discord.gg/R8RG4VdB2")
+	elseif toclipboard then
+		toclipboard("https://discord.gg/R8RG4VdB2")
+	end
+end)
+local tabButtons = {}
+local activeTab = "Draw"
+local function createTabButton(name, positionIndex, iconAsset)
+	local btn = Instance.new("TextButton", sidebar)
+	btn.Name = name .. "Tab"
+	btn.Size = UDim2.new(0, 40, 0, 40)
+	btn.Position = UDim2.new(0.5, -20, 0, 68 + (positionIndex * 50))
+	btn.BackgroundColor3 = COL.BG3
+	btn.BackgroundTransparency = (name == activeTab) and 0 or 1
+	btn.Text = ""
+	btn.AutoButtonColor = false
+	corner(btn, 8)
+	local iconImg = Instance.new("ImageLabel", btn)
+	iconImg.Name = "Icon"
+	iconImg.Size = UDim2.new(0, 20, 0, 20)
+	iconImg.Position = UDim2.new(0.5, -10, 0.5, -10)
+	iconImg.BackgroundTransparency = 1
+	iconImg.Image = iconAsset
+	iconImg.ImageColor3 = (name == activeTab) and COL.Accent or COL.Text3
+	btn.MouseButton1Click:Connect(function()
+		if activeTab == name then return end
+		pages[activeTab].Visible = false
+		local oldBtn = tabButtons[activeTab]
+		local oldIcon = oldBtn:FindFirstChild("Icon")
+		if oldIcon then
+			TweenService:Create(oldIcon, infoFast, {ImageColor3 = COL.Text3}):Play()
+		end
+		TweenService:Create(oldBtn, infoFast, {BackgroundTransparency = 1}):Play()
+		activeTab = name
+		pages[activeTab].Visible = true
+		TweenService:Create(iconImg, infoFast, {ImageColor3 = COL.Accent}):Play()
+		TweenService:Create(btn, infoFast, {BackgroundTransparency = 0}):Play()
+	end)
+	btn.MouseEnter:Connect(function()
+		if activeTab ~= name then
+			TweenService:Create(btn, infoFast, {BackgroundTransparency = 0.5}):Play()
+			TweenService:Create(iconImg, infoFast, {ImageColor3 = COL.Text2}):Play()
+		end
+	end)
+	btn.MouseLeave:Connect(function()
+		if activeTab ~= name then
+			TweenService:Create(btn, infoFast, {BackgroundTransparency = 1}):Play()
+			TweenService:Create(iconImg, infoFast, {ImageColor3 = COL.Text3}):Play()
+		end
+	end)
+	tabButtons[name] = btn
+end
+createTabButton("Draw",     0, ICONS.DrawTab)
+createTabButton("Example",  1, ICONS.ExampleTab)
+createTabButton("Tutorial", 2, ICONS.TutorialTab)
+LMG2L["TextBox_URL"].Focused:Connect(function()
+	TweenService:Create(strokeBox, infoFast, {Color = COL.Accent}):Play()
+end)
+LMG2L["TextBox_URL"].FocusLost:Connect(function()
+	TweenService:Create(strokeBox, infoFast, {Color = COL.Border}):Play()
+end)
+LMG2L["TextBox_URL"]:GetPropertyChangedSignal("Text"):Connect(function()
+	local txt = LMG2L["TextBox_URL"].Text
+	if txt and (#txt > 8) and (string.find(txt, "http") or string.find(txt, "catbox") or string.find(txt, "rbxassetid")) then
+		previewImage.Image = txt
+		previewImage.ImageColor3 = Color3.fromRGB(255, 255, 255)
+		previewDesc.Text = "Preview loaded. Click Draw to render it on the canvas."
+	else
+		previewImage.Image = ICONS.DrawIcon
+		previewImage.ImageColor3 = COL.Text3
+		previewDesc.Text = "Your image will appear here once you paste a valid URL and click Draw."
+	end
+end)
+local toggleState = false
+toggleBackground.MouseButton1Click:Connect(function()
+	toggleState = not toggleState
+	local targetBgColor = toggleState and COL.Accent or COL.BG3
+	local targetStrokeColor = toggleState and COL.AccentLite or COL.BorderLite
+	local targetBallColor = toggleState and Color3.new(1, 1, 1) or COL.Text3
+	local targetPos = toggleState and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+	TweenService:Create(toggleBackground, infoFast, {BackgroundColor3 = targetBgColor}):Play()
+	TweenService:Create(strokeToggle, infoFast, {Color = targetStrokeColor}):Play()
+	TweenService:Create(toggleBall, infoFast, {Position = targetPos, BackgroundColor3 = targetBallColor}):Play()
+end)
+LMG2L["Btn_Draw"].MouseEnter:Connect(function()
+	TweenService:Create(LMG2L["Btn_Draw"], infoFast, {BackgroundColor3 = COL.AccentLite}):Play()
+end)
+LMG2L["Btn_Draw"].MouseLeave:Connect(function()
+	TweenService:Create(LMG2L["Btn_Draw"], infoFast, {BackgroundColor3 = COL.Accent}):Play()
+end)
+LMG2L["Btn_Draw"].MouseButton1Click:Connect(function()
+	local inputUrl = LMG2L["TextBox_URL"].Text
+	task.spawn(function()
+		draw_from_url(inputUrl)
+	end)
+end)
+minimizeBtn.MouseEnter:Connect(function()
+	TweenService:Create(minimizeBtn, infoFast, {BackgroundColor3 = COL.BG_Hover, TextColor3 = COL.Text}):Play()
+end)
+minimizeBtn.MouseLeave:Connect(function()
+	TweenService:Create(minimizeBtn, infoFast, {BackgroundColor3 = COL.BG3, TextColor3 = COL.Text2}):Play()
+end)
+local isMinimized = false
+minimizeBtn.MouseButton1Click:Connect(function()
+	if isMinimized then
+		isMinimized = false
+		minimizeBtn.Text = "—"
+		sidebar.Visible = true
+		pagesContainer.Visible = true
+		sidebar.BackgroundTransparency = 1
+		local t = TweenService:Create(Dashboard, collapseInfo, {Size = UDim2.new(0, 490, 0, 310)})
+		t:Play()
+		TweenService:Create(sidebar, collapseInfo, {BackgroundTransparency = 0}):Play()
+		t.Completed:Connect(function()
+			if isMinimized then return end
+			sidebar.BackgroundTransparency = 0
+		end)
+	else
+		isMinimized = true
+		minimizeBtn.Text = "▽"
+		sidebar.Visible = false
+		pagesContainer.Visible = false
+		TweenService:Create(Dashboard, collapseInfo, {Size = UDim2.new(0, 490, 0, 58)}):Play()
+	end
+end)
+closeBtn.MouseEnter:Connect(function()
+	TweenService:Create(closeBtn, infoFast, {BackgroundColor3 = COL.Danger, TextColor3 = Color3.new(1,1,1)}):Play()
+end)
+closeBtn.MouseLeave:Connect(function()
+	TweenService:Create(closeBtn, infoFast, {BackgroundColor3 = COL.BG3, TextColor3 = COL.Text2}):Play()
+end)
+closeBtn.MouseButton1Click:Connect(function()
+	TweenService:Create(Dashboard, infoFast, {Size = UDim2.new(0, 440, 0, 260), BackgroundTransparency = 1}):Play()
+	TweenService:Create(strokeDash, infoFast, {Transparency = 1}):Play()
+	for _, c in ipairs(Dashboard:GetDescendants()) do
+		if c:IsA("TextLabel") or c:IsA("TextButton") or c:IsA("TextBox") then
+			TweenService:Create(c, infoFast, {TextTransparency = 1, BackgroundTransparency = 1}):Play()
+		elseif c:IsA("ImageLabel") or c:IsA("ImageButton") then
+			TweenService:Create(c, infoFast, {ImageTransparency = 1, BackgroundTransparency = 1}):Play()
+		elseif c:IsA("UIStroke") then
+			TweenService:Create(c, infoFast, {Transparency = 1}):Play()
+		elseif c:IsA("Frame") then
+			TweenService:Create(c, infoFast, {BackgroundTransparency = 1}):Play()
+		end
+	end
+	task.wait(0.25)
+	LMG2L["ScreenGui_1"]:Destroy()
+end)
+LMG2L["Btn_Cancel"].MouseEnter:Connect(function()
+	TweenService:Create(LMG2L["Btn_Cancel"], infoFast, {BackgroundColor3 = COL.BG_Hover, TextColor3 = COL.Text}):Play()
+end)
+LMG2L["Btn_Cancel"].MouseLeave:Connect(function()
+	TweenService:Create(LMG2L["Btn_Cancel"], infoFast, {BackgroundColor3 = COL.BG3, TextColor3 = COL.Text2}):Play()
+end)
+LMG2L["Btn_Cancel"].MouseButton1Click:Connect(function()
+	LMG2L["ScreenGui_1"]:Destroy()
+end)
+LMG2L["Btn_Open"].MouseEnter:Connect(function()
+	TweenService:Create(LMG2L["Btn_Open"], infoFast, {BackgroundColor3 = COL.AccentLite}):Play()
+end)
+LMG2L["Btn_Open"].MouseLeave:Connect(function()
+	TweenService:Create(LMG2L["Btn_Open"], infoFast, {BackgroundColor3 = COL.Accent}):Play()
+end)
+LMG2L["Btn_Open"].MouseButton1Click:Connect(function()
+	local modalHide = TweenService:Create(ModalFrame, infoFast, {
+		Size = UDim2.new(0, 310, 0, 170),
+		Position = UDim2.new(0.5, -155, 0.5, -85),
+		BackgroundTransparency = 1
+	})
+	for _, child in pairs(ModalFrame:GetDescendants()) do
+		if child:IsA("TextLabel") or child:IsA("TextButton") then
+			TweenService:Create(child, infoFast, {TextTransparency = 1, BackgroundTransparency = 1}):Play()
+		elseif child:IsA("UIStroke") then
+			TweenService:Create(child, infoFast, {Transparency = 1}):Play()
+		elseif child:IsA("ImageLabel") then
+			TweenService:Create(child, infoFast, {ImageTransparency = 1}):Play()
+		end
+	end
+	modalHide:Play()
+	modalHide.Completed:Connect(function()
+		ModalFrame.Visible = false
+		isMinimized = false
+		minimizeBtn.Text = "—"
+		sidebar.Visible = true
+		pagesContainer.Visible = true
+		sidebar.BackgroundTransparency = 0
+		Dashboard.Size = UDim2.new(0, 450, 0, 270)
+		Dashboard.Position = UDim2.new(0.5, -225, 0.6, -135)
+		Dashboard.BackgroundTransparency = 1
+		strokeDash.Transparency = 1
+		Dashboard.Visible = true
+		TweenService:Create(Dashboard, infoSmooth, {
+			Size = UDim2.new(0, 490, 0, 310),
+			Position = UDim2.new(0.5, -245, 0.5, -155),
+			BackgroundTransparency = 0
+		}):Play()
+		TweenService:Create(strokeDash, infoSmooth, {Transparency = 0}):Play()
+	end)
+end)
+local dragInput, dragStart, startPos
+local dragging = false
+headerBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+	or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = Dashboard.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+headerBar.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement
+	or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - dragStart
+		local targetPos = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+		TweenService:Create(Dashboard, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetPos}):Play()
+	end
+end)
+return LMG2L["ScreenGui_1"], require;
