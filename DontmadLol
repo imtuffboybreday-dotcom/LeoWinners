@@ -1,4 +1,6 @@
---PLS BRO BC ITS FROM OBFUSTCATE
+--[[PLS BRO BC ITS FROM OBFUSTCATE
+This is remake of gui]]
+
 local LMG2L = {}
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
