@@ -1,18 +1,331 @@
---FUCK YALL USING MY SCRIPT FOR ABUSE BRO NAH
+--mybad bro
 
-while true do
-    pcall(function()
-        local TCS = game:GetService("TextChatService")
-        if TCS.ChatVersion == Enum.ChatVersion.TextChatService then
-            local channel = TCS.TextChannels:FindFirstChild("RBXGeneral")
-            if channel then
-                channel:SendAsync("IM A LOSER")
-            end
-        else
-            game:GetService("ReplicatedStorage")
-                .DefaultChatSystemChatEvents
-                .SayMessageRequest:FireServer("", "All")
-        end
-    end)
-    task.wait(2)
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+
+local player = Players.LocalPlayer
+
+for _, g in ipairs(player:GetDescendants()) do
+    if g.Name == "HDNotif" then g:Destroy() end
 end
+local oldBlur = Lighting:FindFirstChild("HDNotifBlur")
+if oldBlur then oldBlur:Destroy() end
+
+local CONFIG = {
+    Title = "IS ON PROGRESS",
+    Message = "Sorry Coming Soon",
+    SubMessage = "Stay tuned, update dropping soon",
+    ImageId = "rbxassetid://6034684930",
+    Duration = 8,
+}
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "HDNotif"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.DisplayOrder = 999999
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local blur = Instance.new("BlurEffect")
+blur.Name = "HDNotifBlur"
+blur.Size = 0
+blur.Parent = Lighting
+
+local wrap = Instance.new("Frame")
+wrap.Name = "Wrap"
+wrap.Size = UDim2.fromOffset(360, 92)
+wrap.Position = UDim2.new(1, -30, 0, 30)
+wrap.AnchorPoint = Vector2.new(1, 0)
+wrap.BackgroundTransparency = 1
+wrap.Visible = true
+wrap.Parent = screenGui
+
+local wrapScale = Instance.new("UIScale")
+wrapScale.Scale = 1
+wrapScale.Parent = wrap
+
+local box = Instance.new("Frame")
+box.Name = "Box"
+box.Size = UDim2.fromScale(1, 1)
+box.BackgroundColor3 = Color3.fromRGB(0, 255, 247)
+box.BorderSizePixel = 0
+box.Parent = wrap
+
+local boxCorner = Instance.new("UICorner")
+boxCorner.CornerRadius = UDim.new(0, 22)
+boxCorner.Parent = box
+
+local boxGradient = Instance.new("UIGradient")
+boxGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 247)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 153, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 247)),
+})
+boxGradient.Parent = box
+
+local glowOuter = Instance.new("UIStroke")
+glowOuter.Color = Color3.fromRGB(0, 255, 247)
+glowOuter.Thickness = 4
+glowOuter.Transparency = 0.85
+glowOuter.Parent = box
+
+local glowInner = Instance.new("UIStroke")
+glowInner.Color = Color3.fromRGB(0, 255, 247)
+glowInner.Thickness = 1.5
+glowInner.Transparency = 0.1
+glowInner.Parent = box
+
+local inner = Instance.new("Frame")
+inner.Name = "Inner"
+inner.Size = UDim2.new(1, -4, 1, -4)
+inner.Position = UDim2.fromOffset(2, 2)
+inner.BackgroundColor3 = Color3.fromRGB(0, 8, 12)
+inner.BorderSizePixel = 0
+inner.ClipsDescendants = true
+inner.Parent = box
+
+local innerCorner = Instance.new("UICorner")
+innerCorner.CornerRadius = UDim.new(0, 20)
+innerCorner.Parent = inner
+
+local innerGradient = Instance.new("UIGradient")
+innerGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 28, 35)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 12, 20)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 3, 6)),
+})
+innerGradient.Rotation = 135
+innerGradient.Parent = inner
+
+local imgHolder = Instance.new("Frame")
+imgHolder.Size = UDim2.fromOffset(54, 54)
+imgHolder.Position = UDim2.new(0, 16, 0.5, 0)
+imgHolder.AnchorPoint = Vector2.new(0, 0.5)
+imgHolder.BackgroundColor3 = Color3.fromRGB(0, 255, 247)
+imgHolder.BorderSizePixel = 0
+imgHolder.Active = false
+imgHolder.Parent = inner
+
+local imgHolderCorner = Instance.new("UICorner")
+imgHolderCorner.CornerRadius = UDim.new(0, 14)
+imgHolderCorner.Parent = imgHolder
+
+local imgHolderGradient = Instance.new("UIGradient")
+imgHolderGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 247)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 100, 180)),
+})
+imgHolderGradient.Rotation = 45
+imgHolderGradient.Parent = imgHolder
+
+local imgStroke = Instance.new("UIStroke")
+imgStroke.Color = Color3.fromRGB(0, 255, 247)
+imgStroke.Thickness = 1
+imgStroke.Transparency = 0.1
+imgStroke.Parent = imgHolder
+
+local img = Instance.new("ImageLabel")
+img.Size = UDim2.new(1, -8, 1, -8)
+img.Position = UDim2.fromOffset(4, 4)
+img.BackgroundTransparency = 1
+img.Image = CONFIG.ImageId
+img.ImageColor3 = Color3.fromRGB(0, 255, 247)
+img.ScaleType = Enum.ScaleType.Fit
+img.Parent = imgHolder
+
+local imgCorner = Instance.new("UICorner")
+imgCorner.CornerRadius = UDim.new(0, 12)
+imgCorner.Parent = img
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -100, 0, 20)
+title.Position = UDim2.new(0, 84, 0, 22)
+title.BackgroundTransparency = 1
+title.Text = CONFIG.Title
+title.Font = Enum.Font.GothamBlack
+title.TextSize = 15
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = inner
+
+local titleGradient = Instance.new("UIGradient")
+titleGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 247)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+})
+titleGradient.Parent = title
+
+local titleStroke = Instance.new("UIStroke")
+titleStroke.Color = Color3.fromRGB(0, 255, 247)
+titleStroke.Thickness = 1
+titleStroke.Transparency = 0.4
+titleStroke.Parent = title
+
+local msg = Instance.new("TextLabel")
+msg.Size = UDim2.new(1, -100, 0, 34)
+msg.Position = UDim2.new(0, 84, 0, 42)
+msg.BackgroundTransparency = 1
+msg.Text = CONFIG.Message .. "\n" .. CONFIG.SubMessage
+msg.Font = Enum.Font.GothamMedium
+msg.TextSize = 12
+msg.TextColor3 = Color3.fromRGB(166, 245, 255)
+msg.TextXAlignment = Enum.TextXAlignment.Left
+msg.TextYAlignment = Enum.TextYAlignment.Top
+msg.TextWrapped = true
+msg.Parent = inner
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.fromOffset(28, 28)
+closeBtn.Position = UDim2.new(1, -36, 0, 6)
+closeBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 247)
+closeBtn.BackgroundTransparency = 0.92
+closeBtn.Text = "X"
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 14
+closeBtn.TextColor3 = Color3.fromRGB(0, 255, 247)
+closeBtn.AutoButtonColor = false
+closeBtn.BorderSizePixel = 0
+closeBtn.Active = true
+closeBtn.Selectable = true
+closeBtn.ZIndex = 100
+closeBtn.Parent = inner
+
+local closeBtnCorner = Instance.new("UICorner")
+closeBtnCorner.CornerRadius = UDim.new(1, 0)
+closeBtnCorner.Parent = closeBtn
+
+local closeStroke = Instance.new("UIStroke")
+closeStroke.Color = Color3.fromRGB(0, 255, 247)
+closeStroke.Thickness = 1
+closeStroke.Transparency = 0.25
+closeStroke.Parent = closeBtn
+
+local progHolder = Instance.new("Frame")
+progHolder.Size = UDim2.new(1, -40, 0, 2)
+progHolder.Position = UDim2.new(0.5, 0, 1, -8)
+progHolder.AnchorPoint = Vector2.new(0.5, 1)
+progHolder.BackgroundColor3 = Color3.fromRGB(0, 40, 50)
+progHolder.BorderSizePixel = 0
+progHolder.Active = false
+progHolder.Parent = inner
+
+local progHolderCorner = Instance.new("UICorner")
+progHolderCorner.CornerRadius = UDim.new(1, 0)
+progHolderCorner.Parent = progHolder
+
+local prog = Instance.new("Frame")
+prog.Size = UDim2.fromScale(1, 1)
+prog.BackgroundColor3 = Color3.fromRGB(0, 255, 247)
+prog.BorderSizePixel = 0
+prog.Parent = progHolder
+
+local progCorner = Instance.new("UICorner")
+progCorner.CornerRadius = UDim.new(1, 0)
+progCorner.Parent = prog
+
+local progGradient = Instance.new("UIGradient")
+progGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 247)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 153, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 247)),
+})
+progGradient.Parent = prog
+
+local function tween(o, t, p, s, d)
+    local tw = TweenService:Create(o, TweenInfo.new(t, s or Enum.EasingStyle.Quint, d or Enum.EasingDirection.Out), p)
+    tw:Play()
+    return tw
+end
+
+local isClosing = false
+local autoCloseTask
+local gradientConn
+
+local closeNotif
+
+wrapScale.Scale = 0.85
+
+local function show()
+    tween(wrapScale, 0.6, { Scale = 1 }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    tween(blur, 0.6, { Size = 18 }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+    if CONFIG.Duration > 0 then
+        tween(prog, CONFIG.Duration, { Size = UDim2.fromScale(0, 1) }, Enum.EasingStyle.Linear)
+        autoCloseTask = task.delay(CONFIG.Duration, function()
+            closeNotif()
+        end)
+    end
+end
+
+closeNotif = function()
+    if isClosing then return end
+    isClosing = true
+
+    pcall(function()
+        if autoCloseTask then task.cancel(autoCloseTask) end
+    end)
+    pcall(function()
+        if gradientConn then gradientConn:Disconnect() end
+    end)
+
+    pcall(function()
+        tween(blur, 0.4, { Size = 0 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        tween(wrapScale, 0.4, { Scale = 0.85 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+    end)
+
+    task.delay(0.5, function()
+        pcall(function()
+            if wrap and wrap.Parent then wrap:Destroy() end
+        end)
+        pcall(function()
+            if blur and blur.Parent then blur:Destroy() end
+        end)
+        pcall(function()
+            if screenGui and screenGui.Parent then screenGui:Destroy() end
+        end)
+    end)
+end
+
+_G.closeNotifHD = closeNotif
+
+local t = 0
+local w1, w2, w3 = 0, 0, 0
+gradientConn = RunService.RenderStepped:Connect(function(dt)
+    if not wrap or not wrap.Parent then return end
+    t = t + dt
+    local target1 = math.sin(t * 0.7) * 0.4
+    local target2 = math.sin(t * 0.45) * 0.25
+    local target3 = math.sin(t * 1.05) * 0.5
+
+    w1 = w1 + (target1 - w1) * math.min(dt * 4, 1)
+    w2 = w2 + (target2 - w2) * math.min(dt * 3, 1)
+    w3 = w3 + (target3 - w3) * math.min(dt * 5, 1)
+
+    boxGradient.Offset = Vector2.new(w1, 0)
+    innerGradient.Offset = Vector2.new(w2, 0)
+    titleGradient.Offset = Vector2.new(w3, 0)
+    progGradient.Offset = Vector2.new(w1 * 0.8, 0)
+    imgHolderGradient.Offset = Vector2.new(w2 * 0.9, 0)
+end)
+
+closeBtn.MouseEnter:Connect(function()
+    tween(closeBtn, 0.2, { BackgroundTransparency = 0, TextColor3 = Color3.fromRGB(0, 20, 25) })
+    tween(closeStroke, 0.2, { Transparency = 0 })
+end)
+
+closeBtn.MouseLeave:Connect(function()
+    tween(closeBtn, 0.2, { BackgroundTransparency = 0.92, TextColor3 = Color3.fromRGB(0, 255, 247) })
+    tween(closeStroke, 0.2, { Transparency = 0.25 })
+end)
+
+closeBtn.MouseButton1Click:Connect(closeNotif)
+closeBtn.MouseButton1Down:Connect(closeNotif)
+closeBtn.TouchTap:Connect(closeNotif)
+closeBtn.Activated:Connect(closeNotif)
+
+task.wait(0.3)
+show()
